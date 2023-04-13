@@ -1,0 +1,25 @@
+doctype html
+html
+    head
+        meta(name="viewport" content="width=device-width,initial-scale=1.0")
+        link(rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.1/css/all.min.css" integrity="sha512-xA6Hp6oezhjd6LiLZynuukm80f8BoZ3OpcEYaqKoCV3HKQDrYjDE1Gu8ocxgxoXmwmSzM4iqPvCsOkQNiu41GA==" crossorigin="anonymous")
+        title Payment failed
+        script.
+            var time = "!{timeout}" || 5000;
+            if("!{redirectUrl}"){
+                setTimeout(function(){
+                    window.location = "!{redirectUrl}"
+                },time)
+            }
+    body(style={"font-family":"sans-serif"})
+        div(style={"max-width": "400px","box-shadow":"0 0.5em 1em -0.125em #ff572233, 0 0px 0 1px #ff57223b",margin:"3rem auto",padding: "16px", "text-align":"center", "border-radius": "8px"})
+            h2(style={"margin-top":0})
+                i(
+                    class=["fa", "fa-ban"]
+                    style={color:"red", "font-size":"3.5rem"}
+                ) &nbsp;
+                div Payment Failed.
+            div If money was deducated from your account it will be refunded within 5 days.
+            br
+            div If you are not redirected to the website, 
+                a(href=redirectUrl) click here

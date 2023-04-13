@@ -1,0 +1,24 @@
+version: 0.2
+
+phases:
+ install:
+  runtime-versions:
+   nodejs: 12
+  commands:
+   - 'npm install'
+ build:
+  commands:
+   - './scripts/Build.sh'
+
+artifacts:
+ files:
+  - 'dist/**/*'
+  - 'emails/**/*'
+  - 'views/**/*'
+  - 'node_modules/**/*'
+  - 'scripts/**/*'
+  - ecosystem.config.js
+  - appspec.yml
+  - readme.txt
+  - package.json
+  - package-lock.json

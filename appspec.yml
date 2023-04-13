@@ -1,0 +1,27 @@
+---
+files:
+ - destination: /home/ec2-user/app
+   source: /
+hooks:
+ AfterInstall:
+  - location: scripts/AfterInstall.sh
+    runas: ec2-user
+ ApplicationStop:
+  - location: scripts/ApplicationStop.sh
+    runas: ec2-user
+ ApplicationStart:
+  - location: scripts/ApplicationStart.sh
+    runas: ec2-user
+os: linux
+version: 0.0
+permissions:
+ - object: /home/ec2-user/app
+   pattern: '**'
+   owner: ec2-user
+   type:
+    - file
+ - object: /home/ec2-user/app
+   pattern: '**'
+   owner: ec2-user
+   type:
+    - directory

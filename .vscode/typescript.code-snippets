@@ -1,0 +1,47 @@
+{
+	// Place your backend workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and
+	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope
+	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is
+	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are:
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders.
+	// Placeholders with the same ids are connected.
+	// Example:
+	// "Print to console": {
+	// 	"scope": "javascript,typescript",
+	// 	"prefix": "log",
+	// 	"body": [
+	// 		"console.log('$1');",
+	// 		"$2"
+	// 	],
+	// 	"description": "Log output to console"
+	// }
+	"Create Mongoose Model": {
+		"scope": "typescript",
+		"prefix": "cmm",
+		"body": [
+			"import {Document, model,Model, Schema} from 'mongoose';\n",
+			"interface ${1/./${0:/upcase}/} extends Document{\n};",
+			"interface ${1/./${0:/upcase}/}ModelInterface extends Model<${1/./${0:/upcase}/}>{};\n",
+			"const ${1:modelName}Schema = new Schema({\n\t$0\n},{timestamps: true});\n",
+			"const ${1/./${0:/upcase}/}Model = model<${1/./${0:/upcase}/},${1/./${0:/upcase}/}ModelInterface>('${1/./${0:/upcase}/}',$1Schema);\n",
+			"export default ${1/./${0:/upcase}/}Model;"
+		]
+	},
+	"Create Express Router": {
+		"scope": "typescript",
+		"prefix": "cer",
+		"body": [
+			"import {Router} from 'express';\n",
+			"const ${1:routerName}Router = Router();\n",
+			"$1Router.route('$0');\n",
+			"export default $1Router;"
+		]
+	},
+	"Create Express Controller": {
+		"scope": "typescript",
+		"prefix": "cec",
+		"body": [
+			"export async function ${1:functionName}(req:ExpressRequest, res:ExpressResponse, next:ExpressNextFunction){\n\t$0\n}"
+		]
+	}
+}

@@ -1,7 +1,7 @@
 import express from 'express';
 import userRoutes from './server/user/user.route';
 import questionsRoutes from './server/question/question.route';
-import puzzlesRoutes from './server/puzzle/puzzle.route';
+import puzzlesRoutes from './server/phase/puzzle/puzzle.route';
 import sessionRouter from './server/session/session.route';
 import topicsRoutes from './server/topic/topic.route';
 import draftRoutes from './server/draft/draft.route';
@@ -43,6 +43,16 @@ import shortLinkRoutes from './server/crm/shortLinks.routes';
 import feedbackRouter from './server/feedback/router';
 import covidVaccineRoutes from './server/covid-vaccine/route';
 import attendanceRouter from './server/attendance/routes';
+import analyticsRoutes from './server/analytics/analytics.route';
+import addonsRoutes from './server/client-addons/routes';
+import tempRoutes from './server/temp/routes';
+import leaveRouter from './server/leaves/leaves.route';
+import CbtTokenRoutes from './server/cbt/routes';
+import superRouter from './server/super/super.routes';
+import chatsRoutes from './server/chat/chats.routes';
+import inventoryRouter from './server/inventory/inventory.routes';
+import courseRouter from './server/courses/courses.routes';
+import feesRoutes from './server/fees/fees.routes';
 
 const router = express.Router(); // eslint-disable-line new-cap
 
@@ -83,7 +93,7 @@ router.use('/clear-cookie', (req, res) => {
 		})
 		.send({ message: 'cookieCleared' });
 });
-// mount user routes at /users
+
 router.use('/users', userRoutes);
 router.use('/batch', batchRouter);
 router.use('/session', auth.required, sessionRouter);
@@ -102,7 +112,7 @@ router.use('/payments', payments);
 router.use('/query', auth.required, queryRoutes);
 router.use('/serviceManagement', serviceManagementRoutes);
 router.use('/bucket', auth.required, bucketRoutes);
-router.use('/clients', auth.required, clientRoutes);
+router.use('/clients', clientRoutes);
 router.use('/phase', auth.required, phaseRoutes);
 router.use('/log', auth.required, logRoutes);
 router.use('/reports', auth.required, reportRoutes);
@@ -123,9 +133,19 @@ router.use('/migration', migrationsRoutes);
 router.use('/crm', crmRoutes);
 router.use('/feedback', feedbackRouter);
 router.use('/attendance', attendanceRouter);
+router.use('/inventory', inventoryRouter);
+router.use('/leaves', leaveRouter);
+router.use('/add-ons', addonsRoutes);
+router.use('/cbt-manager', CbtTokenRoutes);
+router.use('/super', auth.required, auth.isSuper, superRouter);
+router.use('/chats', chatsRoutes);
+router.use('/courses', courseRouter);
+router.use('/fees', feesRoutes);
+router.use('/temp', tempRoutes);
 /**
  * moderator is the minimum required role to access admin routes
  */
+router.use('/analytics', auth.required, auth.isAtLeastMentor, analyticsRoutes);
 router.use('/admin', auth.required, auth.isAtLeastMentor, adminRoutes);
 router.use('/shared', shortLinkRoutes);
 

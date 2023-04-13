@@ -1,3 +1,6 @@
+import logger from '../../config/winston';
+import { forEach, get, join } from 'lodash';
+
 const schedule = require('node-schedule');
 const { default: Bottleneck } = require('bottleneck');
 const { ObjectId } = require('mongodb');
@@ -17,8 +20,8 @@ const Unsubscribed = require('../email/unsubscribed.model');
 const Question = require('../question/question.model').default;
 
 const GradeTime = require('../assessment/gradeTime.model').default;
-const AssessmentWrapper = require('../assessment/assessmentWrapper.model')
-	.default;
+const AssessmentWrapper =
+	require('../assessment/assessmentWrapper.model').default;
 const WrapperData = require('./WrapperData');
 
 const { isAnswerCorrect, isAnswered } = require('../lib.js');
@@ -193,7 +196,7 @@ function sendEmails() {
 										mail.save();
 									});
 									text += '\n';
-									const supportEmails = ['amit@prepleaf.com', 'aman@prepleaf.com'];
+									const supportEmails = ['neel@prepseed.com', 'vivek@prepseed.com'];
 									sendEmail({
 										subject: 'Routine checkup',
 										to: supportEmails,
@@ -471,22 +474,22 @@ function sendRemaineder(user, label, phase) {
 				text +=
 					' One month is a good amount of time to learn and understand the pattern of questions and test taking strategies.\n\n';
 				text +=
-					'Prepleaf has designed a 20 day course for you to improve your aptitude efficiently. You just need to attempt assessments (of duration 25-30 mins each) as per schedule. Visit https://jobs.prepleaf.com to start preparing.\n\n';
+					'Prepseed has designed a 20 day course for you to improve your aptitude efficiently. You just need to attempt assessments (of duration 25-30 mins each) as per schedule. Visit https://jobs.prepseed.com to start preparing.\n\n';
 				text +=
 					'"A journey of a thousand miles begins with a single step" - Lao Tzu \n\n';
-				text += 'Thank You,\nTeam Prepleaf\n\n';
-				text += `As always, if you'd rather not get emails like this, you can unsubscribe by clicking this link - https://jobs.prepleaf.com/unsubscribe/${user._id}${user.netXp.xp}`;
+				text += 'Thank You,\nTeam Prepseed\n\n';
+				text += `As always, if you'd rather not get emails like this, you can unsubscribe by clicking this link - https://jobs.prepseed.com/unsubscribe/${user._id}${user.netXp.xp}`;
 				const smtpTransport = nodemailer.createTransport({
 					service: 'gmail',
 					auth: {
-						user: 'support@prepleaf.com',
-						pass: 'bing@prepleafX',
+						user: 'help@prepseed.com',
+						pass: '?fH_XyNx#W$3t!E=',
 					},
 				});
 
 				const mailOptions = {
 					to: user.email,
-					from: 'support@prepleaf.com',
+					from: 'help@prepseed.com',
 					subject: 'Checkout 20 Day Course Schedule',
 					text,
 				};
@@ -509,77 +512,76 @@ function gradeSubmissionsGeneric(
 		.then(() => Promise.resolve(assessmentWrapper));
 }
 
-function gradeAssessment() {
+export function gradeAssessment() {
 	// run on only one core
 	console.log('scheduler > gradeAssessment: called');
 
-	const dn = new Date();
-
 	GradeTime.findOneAndUpdate(
-		{
-			graded: false,
-			time: {
-				$lte: new Date(dn.getTime() + 30 * 1000),
-				$gte: new Date(dn.getTime() - 10 * 60 * 1000),
-			},
-		},
+		{ graded: false, time: { $lte: new Date() } },
 		{ $set: { graded: true } }
-	).then((gt) => {
-		if (gt) {
-			console.log('scheduler > remindUsers: gradetime found');
-			AssessmentWrapper.findById(gt.wrapper)
-				.populate([
-					{
-						path: 'core',
-						populate: [
-							{
-								path: 'sections.questions.question',
-								populate: [{ path: 'statistics' }],
-							},
-							{ path: 'preAnalysis analysis' },
-						],
-					},
-					{
-						path: 'analysis',
-					},
-				])
-				.then((assessmentWrapper) => {
-					if (assessmentWrapper) {
-						WrapperData.remove({
-							wrapperAnalysis: assessmentWrapper.analysis._id,
-						}).then(() => {
-							const timeNow = new Date().getTime();
-							const { availableTill } = assessmentWrapper;
-							if (timeNow < availableTill.getTime()) {
-								// not used
-							} else {
-								gradeSubmissionsGeneric(
-									assessmentWrapper,
-									assessmentWrapper.analysis
-								).then(() => {
-									AssessmentWrapper.update(
-										{ _id: assessmentWrapper._id },
-										{ $set: { graded: true } }
+	)
+		.sort({ createdAt: -1 })
+		.then((gt) => {
+			if (gt) {
+				console.log('scheduler > remindUsers: gradetime found');
+				logger.info({ gt });
+				AssessmentWrapper.findById(gt.wrapper)
+					.populate([
+						{
+							path: 'core',
+							populate: [
+								{
+									path: 'sections.questions.question',
+									populate: [{ path: 'statistics' }],
+								},
+								{ path: 'preAnalysis analysis' },
+							],
+						},
+						{
+							path: 'analysis',
+						},
+						{
+							path: 'phases.phase',
+							select: 'name',
+						},
+					])
+					.then((assessmentWrapper) => {
+						if (assessmentWrapper) {
+							WrapperData.remove({
+								wrapperAnalysis: assessmentWrapper.analysis._id,
+							}).then(() => {
+								const timeNow = new Date().getTime();
+								const { availableTill } = assessmentWrapper;
+								if (timeNow < availableTill.getTime()) {
+									// not used
+								} else {
+									gradeSubmissionsGeneric(
+										assessmentWrapper,
+										assessmentWrapper.analysis
 									).then(() => {
-										const text = `Graded assessment ${assessmentWrapper.name}.`;
+										AssessmentWrapper.update(
+											{ _id: assessmentWrapper._id },
+											{ $set: { graded: true } }
+										).then(() => {
+											let phasesList = [];
+											forEach(assessmentWrapper.phases, (ph) => {
+												if (get(ph, 'phase.name', null)) {
+													phasesList.push(get(ph, 'phase.name'));
+												}
+											});
+											const text = `Graded assessment ${
+												assessmentWrapper.name
+											} for phases ${join(phasesList, ', ')}.`;
 
-										sendEmail(
-											{
-												to: ['aman@prepleaf.com'],
-												subject: 'Auto grading completed',
-												body: text,
-												bodyType: 'Text',
-											},
-											() => {}
-										);
-									});
-								}); // try to grade only new submissions to optimize things!
-							}
-						});
-					}
-				});
-		}
-	});
+											logger.info(text);
+										});
+									}); // try to grade only new submissions to optimize things!
+								}
+							});
+						}
+					});
+			}
+		});
 }
 
 schedule.scheduleJob('*/1 * * * *', sendEmails); // move this to diff lib
@@ -588,4 +590,4 @@ schedule.scheduleJob('*/1 * * * *', processQuestionStats); // move this in lambd
 
 schedule.scheduleJob('* * * * *', remindUsers); // move this to diff lib
 
-schedule.scheduleJob('*/5 * * * *', gradeAssessment); // move this to diff lib
+schedule.scheduleJob('*/2 * * * *', gradeAssessment); // move this to diff lib

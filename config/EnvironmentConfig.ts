@@ -1,4 +1,5 @@
 import { ENVIRONMENT } from './ENVIRONMENT';
+import { Socket } from 'socket.io-client';
 
 export type EnvironmentConfig = {
 	devPassword: string;
@@ -25,5 +26,19 @@ export type EnvironmentConfig = {
 	};
 	cors: {
 		allowedDomains: (string | RegExp)[];
+	};
+	zoom: {
+		clientId: string;
+		clientSecret: string;
+		sdkKey: string;
+		sdkSecret: string;
+	};
+	socket: Socket;
+	socketBase: string;
+	aws: {
+		general?: {
+			accessId: string;
+			secretKey: string;
+		};
 	};
 };

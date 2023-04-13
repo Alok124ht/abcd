@@ -8,9 +8,8 @@ export async function getTeamEmails(
 	next: ExpressNextFunction
 ) {
 	const emailsByKey = {
-		amit: 'amit@prepleaf.com',
-		aman: 'aman@prepleaf.com',
-		ankit: 'ankit@prepleaf.com',
+		neel: 'neel@prepseed.com',
+		vivek: 'vivek@prepseed.com',
 	};
 	try {
 		const { captchaToken } = req.body;

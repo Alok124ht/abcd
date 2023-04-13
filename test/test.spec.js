@@ -8,7 +8,7 @@ const expect = chai.expect;
 
 chai.use(chaiHttp);
 
-// const email = 'test1@prepleaf.com'; // use user account! not admin
+// const email = 'test1@prepseed.com'; // use user account! not admin
 // const password = 'prepleaf@blue74';
 // const portal = 'preparation';
 

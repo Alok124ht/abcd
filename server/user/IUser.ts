@@ -23,7 +23,24 @@ export const enum UserRole {
 	MENTOR = 'mentor',
 	MODERATOR = 'moderator',
 	USER = 'user',
+	HR = 'hr',
+	LIBRARIAN = 'librarian',
+	HOD = 'hod',
+	INVENTORY_MANAGER = 'inventory-manager',
+	ACCOUNT_STAFF = 'account-staff',
+	EMPLOYEE = 'employee',
+	PARENT = 'parent',
 }
+
+export const employeeRoles = [
+	'employee',
+	'moderator',
+	'hr',
+	'librarian',
+	'inventory-manager',
+	'mentor',
+	'account-staff',
+];
 
 interface ISubTopic {
 	id: string;
@@ -100,6 +117,21 @@ export interface UserSubscription {
 	];
 }
 
+interface JeeData {
+	studentName: string;
+	fatherName: string;
+	motherName: string;
+	instituteRollNo: string;
+	jeeMainsRollNo: string;
+	jeeMainsDOB: string;
+	jeeMainsMobile: string;
+	jeeMainsEmail: string;
+	jeeAdvancedRollNo: string;
+	jeeAdvancedMobile: string;
+	jeeAdvancedEmail: string;
+	jeeAdvancedDOB: string;
+}
+
 export interface IUser extends Document {
 	username: string;
 	name: string;
@@ -154,7 +186,7 @@ export interface IUser extends Document {
 	thumbnail: string;
 	resetPasswordToken: string;
 	resetPasswordExpires: Date;
-	subscriptions: UserSubscription[];
+	subscriptions?: UserSubscription[];
 	demoStep: number;
 	category: Types.ObjectId | MongooseDocument;
 	version: number;
@@ -164,6 +196,11 @@ export interface IUser extends Document {
 	labelUpdate: Date | number;
 	client: Types.ObjectId | MongooseDocument;
 	subjects: Types.ObjectId[];
+	oldPhases: Types.ObjectId[];
+	portal?: string;
+	joiningDate: Date;
+	jeeData: JeeData;
+	children: IUser[];
 	setPassword: (this: IUser, password: string) => void;
 	validatePassword: (password: string) => boolean;
 	getAccount: (this: IUser) => Promise<UserAccountDocument>;

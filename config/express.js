@@ -50,7 +50,7 @@ const corsOptions = {
 	// 	if (
 	// 		!origin ||
 	// 		whitelist.indexOf(origin) !== -1 ||
-	// 		/(.)*prepleaf.com$/.test(origin) ||
+	// 		/(.)*prepseed.com$/.test(origin) ||
 	// 		/(.)*prepseed.com$/.test(origin) ||
 	// 		process.env.NODE_ENV === 'development'
 	// 	) {
@@ -118,8 +118,14 @@ if (logTransports.length) {
 	app.use(expressWinstonLogger);
 }
 
-// mount all routes on /api path
-app.use(process.env.API_BASE_PATH, routes);
+try {
+	// mount all routes on /api path
+	app.use(process.env.API_BASE_PATH, routes);
+} catch (err) {
+	app.use((req, res, next) => {
+		res.send({ success: false, msg: err.message });
+	});
+}
 
 // if error is not an instanceOf APIError, convert it.
 app.use((err, req, res, next) => {
@@ -173,16 +179,17 @@ if (errorLogTransports.length) {
 }
 
 // error handler, send stacktrace only during development
-app.use((
-	err,
-	req,
-	res,
-	next // eslint-disable-line no-unused-vars
-) =>
-	res.status(err.status).json({
-		message: err.isPublic ? err.message : httpStatus[err.status],
-		stack: config.env === 'development' ? err.stack : undefined,
-	})
+app.use(
+	(
+		err,
+		req,
+		res,
+		next // eslint-disable-line no-unused-vars
+	) =>
+		res.status(err.status).json({
+			message: err.isPublic ? err.message : httpStatus[err.status],
+			stack: config.env === 'development' ? err.stack : undefined,
+		})
 );
 
 module.exports = app;

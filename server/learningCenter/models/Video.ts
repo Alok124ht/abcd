@@ -62,6 +62,10 @@ const VideoSchema = new Schema(
 				value: String,
 			},
 		],
+		isArchived: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	{ timestamps: true }
 );

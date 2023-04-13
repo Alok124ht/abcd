@@ -83,8 +83,8 @@ export async function registerCoaching(
 			sendEmail(
 				{
 					subject,
-					from: 'noreply@prepleaf.com',
-					to: ['amit@prepseed.com'],
+					from: 'help@prepseed.com',
+					to: ['neel@prepseed.com'],
 					body,
 					bodyType: 'text',
 				},

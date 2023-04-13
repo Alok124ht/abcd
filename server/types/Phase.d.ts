@@ -1,4 +1,9 @@
 import { Document, Model, Types } from 'mongoose';
+
+declare enum AttendanceType {
+	lecture = 'lecture',
+	daily = 'daily',
+}
 interface Phase extends Document {
 	name: string;
 	enrollmentStartDate: Date;
@@ -33,6 +38,8 @@ interface Phase extends Document {
 	externalScheduleLink: string;
 	subjects: Types.ObjectId[];
 	deviceLimit: number;
+	attendanceType: AttendanceType;
+	forSchool: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }

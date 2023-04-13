@@ -24,7 +24,7 @@ import {
 	getVideoProgress,
 } from './controllers/playlist';
 import { getDrafts } from './controllers/draft';
-import { updateVideo } from './controllers/video';
+import { archiveVideo, unarchiveVideo, updateVideo } from './controllers/video';
 import commentController from './controllers/comment';
 import playlistSettingsRoutes from './playlistSettings.routes';
 import {
@@ -36,6 +36,7 @@ import {
 	createResourceDocument,
 	updateResourceDocument,
 	getMyUploads,
+	updateResourceVisibility,
 } from './controllers/resource';
 import activityRouter from './route/activity';
 import coursePlanRouter from './route/coursePlan';
@@ -43,6 +44,7 @@ import { hasAccessToPlaylist } from './middlewares';
 import { withUserGroups } from '../user/middlewares';
 import scorecardRouter from './route/scorecard';
 import { getPlaylist, getPlaylists } from './controllers/public_list';
+import { toggleVisibility } from './controllers/playlist';
 
 const router = Router(); // eslint-disable-line new-cap
 
@@ -91,6 +93,10 @@ router
 	.patch(auth.required, auth.isAtLeastMentor, updateVideo);
 router.post('/embed', auth.required, auth.isAtLeastMentor, createEmbed);
 router.route('/hls').post(auth.required, auth.isAtLeastMentor, createHLS);
+
+router.route('/video/archive').post(auth.required, archiveVideo);
+
+router.route('/video/restore').post(auth.required, unarchiveVideo);
 
 /**
  * Documents API starts
@@ -156,6 +162,10 @@ router
 	.route('/playlist/accessibleTo')
 	.patch(auth.required, hasAccessToPlaylist, updateAccessibleTo);
 
+router
+	.route('/playlist/toggle-visibility')
+	.post(auth.required, toggleVisibility);
+
 router.use('/playlist/settings', playlistSettingsRoutes);
 
 /**
@@ -199,6 +209,10 @@ router.route('/playlists/:phase').get(unauthorized__getPlaylistsForPhase);
 router.route('/comment').post(auth.required, commentController.addComment);
 
 router.route('/comments').get(auth.required, commentController.getComments);
+
+router
+	.route('/resource/change-visibility/:id')
+	.get(auth.required, auth.isModerator, updateResourceVisibility);
 
 router.use('/activity', activityRouter);
 router.use('/course-plan', coursePlanRouter);

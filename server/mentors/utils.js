@@ -98,7 +98,7 @@ const createEmailOptionsForMentorAssignment = ({
 	const promise = new Promise((resolve, reject) => {
 		const options = {};
 		options.to = user.email;
-		options.from = 'Prepleaf <noreply@prepleaf.com>';
+		options.from = 'Prepseed <noreply@prepseed.com>';
 		options.subject = `Mentor assigned for ${request.type.label}`;
 
 		const email = new Email();

@@ -11,6 +11,7 @@ import APIError from '../../../helpers/APIError';
 import SubmissionModel from '../../../assessment/submission.model';
 import AdminPermissionResponseLocal from '../../../admin/permissions/types/AdminPermissionResponseLocal';
 import tokenModel from '../../../token/token.model';
+import { getClientOfUser } from '../../../user/utils/user';
 
 export async function createAuthorizedUserFilter(
 	adminPermission: AdminPermissionResponseLocal,
@@ -36,6 +37,16 @@ export async function createAuthorizedUserFilter(
 								$in: [...adminPermission.users, ...adminPermission.usersOfUserGroups],
 							},
 						},
+					],
+				};
+			}
+		}
+		if (role === UserRole.ACCOUNT_STAFF) {
+			const { client } = await getClientOfUser(adminId);
+			if (client) {
+				return {
+					$or: [
+						{ 'subscriptions.subgroups.phases.phase': { $in: [...client.phases] } },
 					],
 				};
 			}
@@ -226,6 +237,9 @@ export const searchUser = async (
 			subscriptions: 1,
 			isVerified: 1,
 			subjects: 1,
+			joiningDate: 1,
+			children: 1,
+			role: 1,
 		};
 		if (Array.isArray(querySelectFields)) {
 			const allowedKeys = ['dp'];
@@ -242,7 +256,14 @@ export const searchUser = async (
 			.limit(limit)
 			.skip(skip)
 			.sort({ _id: -1 })
-			.populate([{ path: 'subscriptions.subgroups.phases.phase', select: 'name' }])
+			.populate([
+				{ path: 'subscriptions.subgroups.phases.phase', select: 'name' },
+				{
+					path: 'children',
+					select,
+					populate: { path: 'subscriptions.subgroups.phases.phase', select: 'name' },
+				},
+			])
 			.exec(async (error, items) => {
 				if (error) {
 					res.status(500).send({

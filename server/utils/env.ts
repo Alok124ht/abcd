@@ -1,6 +1,6 @@
 import config from '../../config/config';
 import { Request } from '../types/Request';
-const defaultCookieHostName = process.env.API_HOSTNAME || 'prepleaf.com';
+const defaultCookieHostName = process.env.API_HOSTNAME || 'prepseed.com';
 const baseApi = `${process.env.API_BASE_HOST}${process.env.API_BASE_PATH}`;
 
 export const getCookieHostName = (req: Request) => {

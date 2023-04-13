@@ -1,3 +1,4 @@
+const { get } = require('lodash');
 const TopicCache = require('../cache/Topic');
 const Question = require('../question/question.model').default;
 const User = require('./user.model').default;
@@ -333,7 +334,7 @@ function userTopics(user) {
 	const { role } = user;
 
 	return new Promise((resolve) => {
-		TopicCache.get((err, topicData) => {
+		TopicCache.get(async (err, topicData) => {
 			if (err) {
 				resolve({});
 			} else if (!topicData) {
@@ -447,6 +448,9 @@ function secureUser(user) {
 		liveAssessment: user.liveAssessment,
 		phases: user.phases,
 		subjects: user.subjects,
+		joiningDate: user.joiningDate,
+		children: user.children,
+		jeeData: user.jeeData,
 		stats: {
 			topics: user.stats.topics.map((topic) => {
 				let topicCorrect = 0;

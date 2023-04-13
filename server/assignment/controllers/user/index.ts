@@ -28,15 +28,16 @@ export async function getSubmission(
 	res: Response,
 	next: NextFunction
 ) {
-	const { id: userId } = req.payload;
-	const { assignment } = req.query;
+	const { id: userId, role } = req.payload;
+	const { assignment, userId: user } = req.query;
+	const userToSearch = role === 'parent' ? user : userId;
 	if (typeof assignment !== 'string') {
 		next(new APIError('Assignment Id not found', 422, true));
 		return;
 	}
 	try {
 		const submissions = await AssignmentSubmission.find({
-			user: userId,
+			user: userToSearch,
 			assignment,
 		});
 		res.send(submissions);
@@ -74,10 +75,11 @@ export async function getAllSubmissions(
 	next: NextFunction
 ) {
 	try {
-		const { id: userId } = req.payload;
-		const submissions = await AssignmentSubmission.find({ user: userId }).select(
-			'assignment createdAt grades'
-		);
+		const { id: userId, role } = req.payload;
+		const userToSearch = role === 'parent' ? req.query.userId : userId;
+		const submissions = await AssignmentSubmission.find({
+			user: userToSearch,
+		}).select('assignment createdAt grades');
 		res.send({ items: submissions });
 	} catch (e) {
 		next();

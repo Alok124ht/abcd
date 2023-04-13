@@ -17,6 +17,7 @@ interface VideoBase extends ResourceBase {
 	liveUrl: string;
 	liveFrom: Date;
 	liveTill: Date;
+	isArchived: boolean;
 }
 
 interface VideoDocument extends Document, VideoBase, ResourceBaseDocument {}

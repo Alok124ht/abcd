@@ -134,11 +134,8 @@ function getPartialMarkingCheckedResponse(response, options, alternateAnswers) {
 	});
 	let bestPossibleScheme = null;
 	[options, ...dummyOptions].forEach((item) => {
-		const {
-			totalCorrects,
-			totalIncorrectResponses,
-			totalCorrectResponses,
-		} = getCheckedResponses(response, item);
+		const { totalCorrects, totalIncorrectResponses, totalCorrectResponses } =
+			getCheckedResponses(response, item);
 		if (!bestPossibleScheme) {
 			bestPossibleScheme = {
 				totalCorrects,
@@ -188,15 +185,12 @@ function getGradedQuestion(
 		newType === 'MULTIPLE_CHOICE_MULTIPLE_CORRECT' &&
 		markingScheme.multipleCorrect === 'JEE_2019'
 	) {
-		const {
-			totalCorrects,
-			totalCorrectResponses,
-			totalIncorrectResponses,
-		} = getPartialMarkingCheckedResponse(
-			response,
-			question.question.multiOptions,
-			question.question.answers
-		);
+		const { totalCorrects, totalCorrectResponses, totalIncorrectResponses } =
+			getPartialMarkingCheckedResponse(
+				response,
+				question.question.multiOptions,
+				question.question.answers
+			);
 
 		let markGained = 0;
 		let markLost = 0;
@@ -432,7 +426,7 @@ function gradeAllSections(
 				) {
 					shouldThisQuestionCount = false;
 				}
-				if (shouldThisQuestionCount && que.answer !== null) {
+				if (shouldThisQuestionCount && que.answer !== null && que.answer !== '') {
 					questionsCountedByQuestionGroupIndex[questionGroupIndex] += 1;
 				}
 				if (shouldThisQuestionCount) {

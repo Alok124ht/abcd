@@ -1,5 +1,5 @@
 import { Types } from 'mongoose';
-import { concat, has } from 'lodash';
+import { concat, get, has } from 'lodash';
 import SubGroupModel from '../../../group/subGroup.model';
 import SuperGroupModel from '../../../group/superGroup.model';
 import ClientModel from '../../../client/client.model';
@@ -8,6 +8,8 @@ import { UserRole } from '../../../user/IUser';
 import { isEqualOrBelow } from '../../../utils/user/role';
 import { clearFromCache } from '../../../cache/Phase';
 import { SubGroup } from '../../../types/SubGroup';
+import UserModel from '../../../user/user.model';
+import APIError from '../../../helpers/APIError';
 
 export async function getPhases(
 	req: ExpressRequest,
@@ -32,6 +34,35 @@ export async function getPhases(
 			_id: { $in: adminPermission.phases },
 		});
 		res.send({ phases, success: true });
+	} else if (role === UserRole.ACCOUNT_STAFF) {
+		UserModel.findById(id)
+			.then((user) => {
+				const phase = get(user, 'subscrptions[0].subgroups[0].phases[0].phase');
+				if (!phase) {
+					next(new APIError('Phase not found!'));
+				} else {
+					ClientModel.findOne({ phases: phase })
+						.then((cli) => {
+							if (!cli) {
+								next(new APIError('Client not found!'));
+							} else {
+								PhaseModel.find({ _id: { $in: cli.phases } })
+									.then((phases) => {
+										res.send({ phases, success: true });
+									})
+									.catch((err) => {
+										next(err);
+									});
+							}
+						})
+						.catch((err) => {
+							next(err);
+						});
+				}
+			})
+			.catch((err) => {
+				next(err);
+			});
 	} else {
 		const phases = await PhaseModel.find();
 		res.json({ success: true, phases });

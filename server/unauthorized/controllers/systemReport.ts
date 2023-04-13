@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import SystemReportModel from '../../models/SystemReport';
-import { getTokenFromHeaders } from '../../utils/auth';
+import getTokenFromHeaders from '../../utils/auth';
 
 export async function recordSystemReport(
 	req: ExpressRequest,

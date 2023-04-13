@@ -72,7 +72,7 @@ async function notifyUser(
 					if (config.env !== ENVIRONMENT.DEV) {
 						sendSMS(
 							`91${user.mobileNumber}`,
-							`COVID-19 Vaccine available ${centerSMSMText}. Visit prepleaf.com/c?${alertStat.key} to book your slot.\n\nTeam Prepleaf`
+							`COVID-19 Vaccine available ${centerSMSMText}. Visit prepseed.com/c?${alertStat.key} to book your slot.\n\nTeam Prepseed`
 						);
 					} else {
 						console.log(alertStat.toObject());
@@ -96,13 +96,14 @@ async function notifyUser(
 
 export async function findAndMatchVaccineAvailabilityPendingRequestsAndSendNotification(): Promise<void> {
 	logger.info('COVID-19-notification: findAndMatchVaccineAvailability called');
-	const pendingRequests = await getAllPendingVaccineAvailabilityNotificationRequests(
-		'centers user state districts centers minAgeLimit from till vaccine minAvailableCapacity lastTriggeredAt lastMessageSentAt',
-		{
-			path: 'centers',
-			select: 'name blockName district',
-		}
-	);
+	const pendingRequests =
+		await getAllPendingVaccineAvailabilityNotificationRequests(
+			'centers user state districts centers minAgeLimit from till vaccine minAvailableCapacity lastTriggeredAt lastMessageSentAt',
+			{
+				path: 'centers',
+				select: 'name blockName district',
+			}
+		);
 	logger.info(
 		`COVID-19-notification: ${pendingRequests.length} requests pending`
 	);

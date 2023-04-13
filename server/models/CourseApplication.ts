@@ -7,7 +7,7 @@ export const enum ApplicationState {
 	assignmentSent = 'Assignment Sent',
 	assignmentSubmitted = 'Assignment Submitted',
 	interviewScheduled = 'Interview Scheduled',
-	prepleafAccepted = 'Prepleaf Accepted',
+	prepleafAccepted = 'Prepseed Accepted',
 	studentRegistered = 'Student Registered',
 }
 

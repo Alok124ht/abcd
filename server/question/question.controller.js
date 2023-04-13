@@ -1829,7 +1829,7 @@ function reportQuestion(req, res) {
 			}
 			const email = new Email({
 				subject: 'Report',
-				data: `https://admin.prepleaf.com/questions/?id=${qid}`,
+				data: `https://admin.prepseed.com/questions/?id=${qid}`,
 			});
 			email.save();
 		}

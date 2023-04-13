@@ -9,7 +9,7 @@ const Submission = require('../assessment/submission.model').default;
 const AssessmentTypeCache = require('../cache/AssessmentType');
 const WrapperStatsCache = require('../cache/WrapperStats');
 const UserCache = require('../cache/User');
-const { forEach, size } = require('lodash');
+const { forEach, size, filter, toLower } = require('lodash');
 const AssessmentCoreCache = require('../cache/AssessmentCore');
 const logger = require('../../config/winston').default;
 const { getActivePhasesFromSubscriptions } = require('../utils/phase');
@@ -17,6 +17,8 @@ const { performance, PerformanceObserver } = require('perf_hooks');
 const { getMaxMarks, getSecMaxMarks } = require('../lib');
 const APIError = require('../helpers/APIError');
 const { get } = require('lodash');
+const { default: UserModel } = require('./user.model');
+const { default: submissionModel } = require('../assessment/submission.model');
 
 const perfObserver = new PerformanceObserver((items) => {
 	items.getEntries().forEach((entry) => {
@@ -633,7 +635,8 @@ function getReports(req, res, next) {
 							if (
 								!wrapper.type ||
 								wrapper.type === 'TOPIC-MOCK' ||
-								!wrapper.showInReports
+								!wrapper.showInReports ||
+								wrapper.hideResults
 							) {
 								return false;
 							}
@@ -783,6 +786,137 @@ function getReports(req, res, next) {
 	});
 }
 
-module.exports = {
-	getReports,
+const getReports2 = async (req, res) => {
+	try {
+		const { id: payloadId, role } = req.payload;
+		const { user: reqUserId } = req.query;
+		let isMentorOrAbove = false;
+
+		if (['mentor', 'moderator', 'admin', 'super'].includes(role))
+			isMentorOrAbove = true;
+
+		const id = isMentorOrAbove && reqUserId ? reqUserId : payloadId;
+
+		const user = await UserModel.findById(id);
+		if (!user) return res.send({ success: false, msg: 'User not found' });
+
+		const getTopperMarks = (coreAnalysis) => {
+			let overAllMaxMarks = 0;
+			let sectionMarks = [];
+			forEach(coreAnalysis.marks, (mark) => {
+				if (mark.marks > overAllMaxMarks) overAllMaxMarks = mark.marks;
+			});
+			const sectionLength = get(coreAnalysis, 'sections', []).length;
+			for (var i = 0; i < sectionLength; i++) sectionMarks[i] = 0;
+			forEach(coreAnalysis.sections, (section, sectionIndex) => {
+				forEach(section.marks, (marks) => {
+					if (marks > sectionMarks[sectionIndex]) sectionMarks[sectionIndex] = marks;
+				});
+			});
+			return { overAllMaxMarks, sectionMarks };
+		};
+
+		const getAverageMarks = (sumMarks, totalAttempts, sections) => {
+			const overallAverage = totalAttempts === 0 ? 0 : sumMarks / totalAttempts;
+			const sectionAverage = [];
+			forEach(sections, (section) => {
+				sectionAverage.push(
+					totalAttempts === 0 ? 0 : section.sumMarks / totalAttempts
+				);
+			});
+			return { overallAverage, sectionAverage };
+		};
+
+		const getMaxMarks = (sections) => {
+			const sectionMaxMarks = [];
+			forEach(sections, (section) => {
+				sectionMaxMarks.push(section.maxMarks);
+			});
+			return sectionMaxMarks;
+		};
+
+		submissionModel
+			.find({ user: id })
+			.sort({ createdAt: -1 })
+			.select('meta coreAnalysis assessmentWrapper')
+			.populate([
+				{
+					path: 'coreAnalysis',
+					select: 'marks maxMarks sumMarks totalAttempts sections',
+				},
+				{
+					path: 'assessmentWrapper',
+					select: 'type showInReports name availableFrom',
+				},
+			])
+			.then((submissions) => {
+				const filteredSubmissions = filter(submissions, (submission) => {
+					const wrapper = get(submission, 'assessmentWrapper', null);
+					if (!wrapper) return false;
+					const type = get(wrapper, 'type', null);
+					const showInReports = get(wrapper, 'showInReports', null);
+					const hideResults = get(wrapper, 'hideResults', false);
+					if (!type || type === 'TOPIC-MOCK' || !showInReports || hideResults)
+						return false;
+					return true;
+				});
+				const wrappers = [];
+				forEach(filteredSubmissions, (submission) => {
+					const coreAnalysis = get(submission, 'coreAnalysis', null);
+					if (coreAnalysis) {
+						const { overAllMaxMarks, sectionMarks } = getTopperMarks(coreAnalysis);
+						const { overallAverage, sectionAverage } = getAverageMarks(
+							coreAnalysis.sumMarks,
+							coreAnalysis.totalAttempts,
+							coreAnalysis.sections
+						);
+						const object = {
+							assessment: {
+								name: get(submission, 'assessmentWrapper.name', ''),
+								availableFrom: get(submission, 'assessmentWrapper.availableFrom', ''),
+							},
+						};
+						object.overall = {
+							maxMarks: coreAnalysis.maxMarks,
+							marks: get(submission, 'meta.marks', 0),
+							precision: get(submission, 'meta.precision', 0),
+							percentage:
+								(get(submission, 'meta.marks', 0) * 100) /
+								(coreAnalysis.maxMarks || 100),
+							topperMarks: overAllMaxMarks,
+							average: overallAverage,
+						};
+						const sectionMaxMarks = getMaxMarks(get(coreAnalysis, 'sections', []));
+						forEach(get(submission, 'meta.sections', []), (section, index) => {
+							const name = toLower(get(section, 'name', `${index + 1}`));
+							object[name] = {
+								maxMarks: sectionMaxMarks[index]
+									? sectionMaxMarks[index]
+									: coreAnalysis.maxMarks / coreAnalysis.sections.length,
+								marks: get(section, 'marks', 0),
+								precision: get(section, 'precision', 0),
+								percentage:
+									(get(section, 'marks', 0) * 100) /
+									(sectionMaxMarks[index]
+										? sectionMaxMarks[index]
+										: coreAnalysis.maxMarks / coreAnalysis.sections.length),
+								topperMarks: sectionMarks[index],
+								average: sectionAverage[index],
+							};
+						});
+						wrappers.push(object);
+					}
+				});
+				res.send({ success: true, wrappers });
+			})
+			.catch((err) => {
+				console.log(err);
+				res.send({ success: false, msg: 'Error while loading data...' });
+			});
+	} catch (err) {
+		console.log(err);
+		res.send({ success: false, msg: 'Error while processing data...' });
+	}
 };
+
+module.exports = { getReports, getReports2 };

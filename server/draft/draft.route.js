@@ -9,6 +9,7 @@ const auth = require('../middleware/auth').default;
 router.route('/list').post(draftCtrl.list);
 router.route('/save').post(auth.isModerator, draftCtrl.save);
 router.route('/archive').post(auth.isModerator, draftCtrl.archive);
+router.route('/unarchive').post(auth.isModerator, draftCtrl.unarchive);
 router.route('/update').post(auth.isModerator, draftCtrl.update);
 router.route('/publish').post(auth.isModerator, draftCtrl.publish);
 

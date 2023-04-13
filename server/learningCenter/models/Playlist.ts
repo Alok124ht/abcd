@@ -79,11 +79,15 @@ const PlaylistSchema = new Schema(
 		resourceType: {
 			type: String,
 			default: 'Video',
-			enum: ['Video', 'ResourceDocument', 'Assignment'],
+			enum: ['Video', 'ResourceDocument', 'Assignment', 'Book'],
 		},
 		setting: {
 			type: ObjectId,
 			ref: 'PlaylistSetting',
+		},
+		isArchived: {
+			type: Boolean,
+			default: false,
 		},
 	},
 	{ timestamps: true }
@@ -110,6 +114,7 @@ PlaylistSchema.method(
 			serviceMachineNamesRequired: this.serviceMachineNamesRequired,
 			serviceMachineNames: this.serviceMachineNames,
 			subject: this.subject,
+			createdBy: this.createdBy,
 		};
 	}
 );

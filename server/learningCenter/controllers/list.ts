@@ -3,6 +3,8 @@ import { FilterQuery, model, Types } from 'mongoose';
 import { Request } from '../../types/Request';
 import APIError from '../../helpers/APIError';
 import { ResourceBaseDocument } from '../models/ResourceBaseSchema';
+import ClientModel from '../../client/client.model';
+import UserModel from '../../user/user.model';
 
 export async function myUploads(
 	req: Request,
@@ -36,7 +38,7 @@ export async function myUploads(
 			if (!query.$and) {
 				query.$and = [];
 			}
-			query.$and.push({ createdBy: Types.ObjectId(userId) });
+			// query.$and.push({ createdBy: Types.ObjectId(userId) });
 		}
 		if (typeof q === 'string' && q.trim()) {
 			const or: FilterQuery<ResourceBaseDocument>[] = [];
@@ -55,19 +57,47 @@ export async function myUploads(
 			if (!query.$and) {
 				query.$and = [];
 			}
+			// @ts-ignore
 			query.$and.push({ $or: or });
 		}
+
 		try {
 			const SelectedModel = model<ResourceBaseDocument>(resourceType);
-			const total = await SelectedModel.countDocuments(query);
 
-			const videos = await SelectedModel.find(query)
-				.sort({ _id: -1 })
+			let extraQuery: any = {};
+
+			if (role === 'moderator' || role === 'mentor') {
+				extraQuery.isArchived = { $ne: true };
+				let createdBy = [Types.ObjectId(userId)];
+				if (role === 'moderator') {
+					const client = await ClientModel.findOne({ moderators: userId }).select(
+						'phases'
+					);
+					const users = await UserModel.find({
+						// @ts-ignore
+						role: { $in: ['mentor', 'moderator'] },
+						'subscriptions.subgroups.phases.phase': { $in: client.phases },
+					}).select('_id');
+					users.forEach((user) => {
+						createdBy.push(Types.ObjectId(user._id));
+					});
+				}
+				query.$and.push({ createdBy: { $in: createdBy } });
+			}
+
+			const total = await SelectedModel.countDocuments({
+				...query,
+				...extraQuery,
+			});
+
+			const videos = await SelectedModel.find({ ...query, ...extraQuery })
+				.sort({ createdAt: -1, isArchived: 1 })
 				.skip(skip)
 				.limit(limit)
 				.exec();
 			res.send({ items: videos, total });
 		} catch (error) {
+			console.log(error.message);
 			res
 				.status(500)
 				.send({ message: 'Internal server error', error: error.message });

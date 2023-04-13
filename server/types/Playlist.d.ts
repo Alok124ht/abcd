@@ -13,6 +13,7 @@ export const enum ResourceType {
 	Video = 'Video',
 	ResourceDocument = 'ResourceDocument',
 	Assignment = 'Assignment',
+	Book = 'Book',
 }
 
 interface PlaylistBase {
@@ -25,6 +26,7 @@ interface PlaylistBase {
 	resourceType: ResourceType;
 	createdAt: Date;
 	updatedAt: Date;
+	isArchived: boolean;
 }
 
 type MakePlaylistForPublicReturn = Pick<
@@ -39,6 +41,7 @@ type MakePlaylistForPublicReturn = Pick<
 	| 'resourceType'
 	| 'serviceMachineNamesRequired'
 	| 'serviceMachineNames'
+	| 'createdBy'
 > & { hasAccessToContent: boolean };
 
 interface Playlist extends Document, PlaylistBase {

@@ -197,7 +197,7 @@ AssessmentCoreSchema.statics = {
 				{
 					path: 'wrappers.wrapper',
 					select:
-						'name phases type topic availableFrom availableTill visibleFrom graded isArchived visibleForServices prequel sequel hideResults hideDetailedAnalysis permissions tags',
+						'name phases type topic availableFrom availableTill expiresOn visibleFrom graded isArchived visibleForServices prequel sequel hideResults hideDetailedAnalysis permissions tags onlyCBT',
 					populate: [
 						{ path: 'phases.phase', select: 'name' },
 						{ path: 'visibleForServices', select: 'name' },
@@ -276,7 +276,7 @@ AssessmentCoreSchema.statics = {
 				{
 					path: 'wrappers.wrapper',
 					select:
-						'name phases type topic availableFrom availableTill visibleFrom graded isArchived visibleForServices prequel sequel hideResults hideDetailedAnalysis permissions tags',
+						'name phases type topic availableFrom availableTill visibleFrom graded isArchived visibleForServices prequel sequel hideResults hideDetailedAnalysis permissions tags onlyCBT',
 					populate: [
 						{ path: 'phases.phase', select: 'name' },
 						{ path: 'visibleForServices', select: 'name' },

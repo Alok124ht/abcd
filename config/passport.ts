@@ -68,6 +68,20 @@ use(
 												'topicMocks sectionalMocks fullMocks liveTests endDate topics',
 										},
 									])
+									.populate([
+										{
+											path: 'children',
+											select:
+												'name email username mobileNumber subscriptions.subgroups.phases.phase',
+											populate: [
+												{
+													path: 'subscriptions.subgroups.phases.phase',
+													select:
+														'topicMocks sectionalMocks fullMocks liveTests endDate topics',
+												},
+											],
+										},
+									])
 									.then((user) => {
 										if (user) {
 											done(null, user);
@@ -89,6 +103,20 @@ use(
 										path: 'subscriptions.subgroups.phases.phase',
 										select:
 											'topicMocks sectionalMocks fullMocks liveTests endDate topics',
+									},
+								])
+								.populate([
+									{
+										path: 'children',
+										select:
+											'name email username mobileNumber subscriptions.subgroups.phases.phase',
+										populate: [
+											{
+												path: 'subscriptions.subgroups.phases.phase',
+												select:
+													'topicMocks sectionalMocks fullMocks liveTests endDate topics',
+											},
+										],
 									},
 								])
 								.then((user) => {
@@ -113,6 +141,20 @@ use(
 								{
 									path: 'subscriptions.subgroups.phases.phase',
 									select: 'topicMocks sectionalMocks fullMocks liveTests endDate topics',
+								},
+							])
+							.populate([
+								{
+									path: 'children',
+									select:
+										'name email username mobileNumber subscriptions.subgroups.phases.phase',
+									populate: [
+										{
+											path: 'subscriptions.subgroups.phases.phase',
+											select:
+												'topicMocks sectionalMocks fullMocks liveTests endDate topics',
+										},
+									],
 								},
 							])
 							.exec()

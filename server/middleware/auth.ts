@@ -9,11 +9,12 @@ import APIError from '../helpers/APIError';
 import User from '../user/user.model';
 import ClientModel from '../client/client.model';
 import { getCookieHostName } from '../utils/env';
-import { getTokenFromHeaders } from '../utils/auth';
 import { IUser, UserRole } from '../user/IUser';
 import { isAtLeast } from '../utils/user/role';
+import { default as getTokenFromHeaders } from '../utils/auth';
 
-const userHasRole = (user: IUser, role: UserRole) => isAtLeast(role, user.role);
+const userHasRole = (user: IUser, role: UserRole) =>
+	isAtLeast(role, user.role) || role === 'super';
 
 const getUser = (
 	req: Request,
@@ -35,21 +36,18 @@ const getUser = (
 	}
 };
 
-const createRoleValidator = (role: UserRole) => (
-	req: Request,
-	res: Response,
-	next: NextFunction
-) => {
-	getUser(req, res, (user: IUser) => {
-		if (user && userHasRole(user, role)) {
-			next();
-		} else {
-			res.status(403).send({
-				message: 'You do not have required permission',
-			});
-		}
-	});
-};
+const createRoleValidator =
+	(role: UserRole) => (req: Request, res: Response, next: NextFunction) => {
+		getUser(req, res, (user: IUser) => {
+			if (user && userHasRole(user, role)) {
+				next();
+			} else {
+				res.status(403).send({
+					message: 'You do not have required permission',
+				});
+			}
+		});
+	};
 
 const isModerator = createRoleValidator(UserRole.MODERATOR);
 
@@ -126,27 +124,24 @@ const withClientOptional = (
 	}
 };
 
-const createWithUser = (select: any) => (
-	req: Request,
-	res: Response,
-	next: NextFunction
-) => {
-	const { id: userId } = req.payload;
-	User.findById(userId)
-		.select(select)
-		.exec((error, user) => {
-			if (error) {
-				res.status(500).send({
-					message: 'Database error occurred while searching for user',
-					code: 'database-error',
-				});
-			} else {
-				// eslint-disable-next-line
-				res.locals.user = user;
-				next();
-			}
-		});
-};
+const createWithUser =
+	(select: any) => (req: Request, res: Response, next: NextFunction) => {
+		const { id: userId } = req.payload;
+		User.findById(userId)
+			.select(select)
+			.exec((error, user) => {
+				if (error) {
+					res.status(500).send({
+						message: 'Database error occurred while searching for user',
+						code: 'database-error',
+					});
+				} else {
+					// eslint-disable-next-line
+					res.locals.user = user;
+					next();
+				}
+			});
+	};
 
 const maxCookieAge = 60 * 24 * 60 * 60 * 1000;
 const refreshToken = (req: Request, res: Response, next: NextFunction) => {

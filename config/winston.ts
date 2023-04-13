@@ -1,7 +1,9 @@
 import { createLogger, transports as _transports } from 'winston';
 import WinstonCloudWatch from 'winston-cloudwatch';
 import { createHash } from 'crypto';
-import { env } from './config';
+import { get } from 'lodash';
+
+require('dotenv').config();
 
 const startTime = new Date().toISOString();
 const randomNumber = Math.round(Math.random() * 10000);
@@ -14,17 +16,28 @@ const getStreamName = () => {
 };
 
 const logger = createLogger({
-	transports: [new _transports.Console()],
+	transports: [
+		new _transports.Console(),
+		new _transports.File({ level: 'info', filename: 'combined.log' }),
+	],
 });
 
-if (['production'].includes(env)) {
+if (['production'].includes(process.env.NODE_ENV)) {
 	logger.clear();
 }
 
-if (['production'].includes(env)) {
+if (['production'].includes(process.env.NODE_ENV)) {
 	const winstonCloudWatchTransport = new WinstonCloudWatch({
-		logGroupName: `${env}/logs`,
+		logGroupName: `${process.env.NODE_ENV}/logs`,
 		logStreamName: getStreamName,
+		awsOptions: {
+			credentials: {
+				accessKeyId: get(process.env, 'GENERAL_AWS_ACCESS_KEY_ID'),
+				secretAccessKey: get(process.env, 'GENERAL_AWS_SECRET_ACCESS_KEY'),
+			},
+			region: 'ap-south-1',
+		},
+		jsonMessage: true,
 	});
 	logger.add(winstonCloudWatchTransport);
 }

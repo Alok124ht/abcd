@@ -127,8 +127,8 @@ const sendPaymentSuccessEmail = (order) => {
 				{
 					subject:
 						order.course.type === 'combo'
-							? `Purchase of ${order.course.title} combo pack | Prepleaf P4`
-							: `Registration for ${order.course.title} | Prepleaf P4`,
+							? `Purchase of ${order.course.title} combo pack | Prepseed P4`
+							: `Registration for ${order.course.title} | Prepseed P4`,
 					to: [order.email],
 					body: html,
 					bodyType: 'html',

@@ -6,7 +6,7 @@ import {
 } from './discussion.model';
 
 export function checkedUsername(username: string) {
-	if (username.indexOf('NOTSET') >= 0) return 'Prepleaf-User';
+	if (username.indexOf('NOTSET') >= 0) return 'Prepseed-User';
 	return username;
 }
 
@@ -31,7 +31,7 @@ export function secureDiscussion(discussion: DiscussionDocument) {
 			const replies: SubThreadSecure[] = [];
 			t.threads.forEach((tt) => {
 				if (!tt.isDeleted) {
-					const user = (tt.user as unknown) as IUser;
+					const user = tt.user as unknown as IUser;
 					replies.push({
 						_id: tt._id,
 						text: tt.text,
@@ -42,7 +42,7 @@ export function secureDiscussion(discussion: DiscussionDocument) {
 					});
 				}
 			});
-			const user = (t.user as unknown) as IUser;
+			const user = t.user as unknown as IUser;
 			secureThreads.push({
 				_id: t._id,
 				kind: t.kind,

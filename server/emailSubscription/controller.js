@@ -69,7 +69,7 @@ const addEmailToBounceList = (req, res) => {
 				});
 				sendEmail(
 					{
-						to: ['amit@prepleaf.com'],
+						to: ['neel@prepseed.com'],
 						bodyType: 'Text',
 						body: `Received a complain from ${email}`,
 						subject: 'Email Complaint Received',
@@ -80,7 +80,7 @@ const addEmailToBounceList = (req, res) => {
 		} else if (body.Type === 'SubscriptionConfirmation') {
 			sendEmail(
 				{
-					to: ['amit@prepleaf.com'],
+					to: ['neel@prepseed.com'],
 					bodyType: 'Text',
 					body: req.body,
 					subject: 'Confirmation Message recieved from AWS',

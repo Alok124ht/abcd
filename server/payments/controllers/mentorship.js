@@ -128,7 +128,7 @@ const startPaymentForMentorship = (req, res) => {
 										key_id: key,
 										amount: order.amount,
 										order_id: order.razorpayOrderId,
-										name: 'Prepleaf',
+										name: 'Prepseed',
 										description: 'Request for a mentor',
 										notes,
 										prefill,

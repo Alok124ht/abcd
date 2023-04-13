@@ -1,11 +1,12 @@
 import { NextFunction, Request as ERequest, Response } from 'express';
 import AdminPermissionResponseLocal from '../admin/permissions/types/AdminPermissionResponseLocal';
 import { IUser } from '../user/IUser';
-import { UserGroupDocument } from './UserGroup';
+import { Types } from 'mongoose';
 
 interface Payload {
 	id?: string;
 	role?: string;
+	client?: Types.ObjectId | string;
 }
 
 export interface Request extends ERequest {

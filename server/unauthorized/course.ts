@@ -149,7 +149,7 @@ export async function applyForCourse(
 				next(new APIError('Unknown error', 500, true));
 				sendEmail({
 					subject: 'Failed to save course application',
-					to: ['amit@prepleaf.com'],
+					to: ['neel@prepseed.com'],
 					body: `Name: ${name}\nEmail: ${email}\n Mobile Number: ${mobileNumber}\nGraduation Year: ${graduationYear}\nExperience in Years: ${experienceYears}\nCV: ${cvUrl}`,
 					bodyType: 'text',
 				});
@@ -158,7 +158,7 @@ export async function applyForCourse(
 				sendEmail(
 					{
 						subject: 'Received application for Analytics and Data Science',
-						to: ['aman@prepleaf.com', 'amit@prepleaf.com'],
+						to: ['vivek@prepseed.com', 'neel@prepseed.com'],
 						body: `Name: ${name}\nEmail: ${email}\nMobile Number: ${mobileNumber}\nPreferred Payment Mode: ${paymentMethod}\nGraduation Year: ${graduationYear}\nExperience in Years: ${experienceYears}\nCV: ${cvUrl}`,
 						bodyType: 'text',
 					},
@@ -190,14 +190,8 @@ export async function submitBasicDetails(
 	res: Response,
 	next: NextFunction
 ) {
-	const {
-		name,
-		email,
-		mobileNumber,
-		collegeName,
-		paymentMethod,
-		course,
-	} = req.body;
+	const { name, email, mobileNumber, collegeName, paymentMethod, course } =
+		req.body;
 
 	const { error } = courseApplicationBasicDetailJoiSchema.validate(req.body);
 	const submittedBy = req.payload ? req.payload.id : null;
@@ -433,10 +427,7 @@ export async function addCouseQueryDetails(
 				sendEmail(
 					{
 						subject: `Callback request received for Course`,
-						to:
-							config.env === 'production'
-								? ['aman@prepleaf.com', 'randhir@prepleaf.com']
-								: ['amit@prepleaf.com'],
+						to: ['neel@prepseed.com'],
 						body: body,
 						bodyType: 'html',
 					},

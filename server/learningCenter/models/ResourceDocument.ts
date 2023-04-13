@@ -7,6 +7,7 @@ import ResourceBaseSchema, {
 
 interface ResourceDocumentBase extends ResourceBase {
 	endpoints: string[];
+	type: 'document' | 'book';
 }
 
 interface ResourceDocument extends ResourceBaseDocument, ResourceDocumentBase {}
@@ -14,11 +15,8 @@ interface ResourceDocument extends ResourceBaseDocument, ResourceDocumentBase {}
 const ResourceDocumentSchema = new Schema(
 	{
 		...ResourceBaseSchema,
-		endpoints: [
-			{
-				type: String,
-			},
-		],
+		endpoints: [{ type: String }],
+		type: { type: String, default: 'document' },
 	},
 	{ timestamps: true }
 );

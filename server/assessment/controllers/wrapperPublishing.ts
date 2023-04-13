@@ -11,6 +11,7 @@ import { clearPhaseWrapperCache } from '../utils/cache';
 import AssessmentWrapperCache from '../../cache/AssessmentWrapper';
 import { PublishedInPhaseDetail } from 'server/types/AssessmentWrapper';
 import { TagList } from 'server/types/Tag';
+import GradeTimeModel from '../gradeTime.model';
 
 export function addPhase(req: Request, res: Response) {
 	const {
@@ -105,7 +106,6 @@ export function addWrapper(
 		availableFrom,
 		availableTill,
 		visibleFrom,
-		expiry,
 		expiresOn,
 		cost,
 		reward,
@@ -113,6 +113,7 @@ export function addWrapper(
 		series,
 		phases,
 		tags,
+		onlyCBT,
 	} = req.body;
 
 	if (!name) {
@@ -125,8 +126,6 @@ export function addWrapper(
 	} else if (type === 'SECTIONAL-MOCK' && !section) {
 		res.json({ success: false, c: 4 });
 	} else if (!availableFrom || !availableTill || !visibleFrom) {
-		res.json({ success: false, c: 5 });
-	} else if (expiry && !expiresOn) {
 		res.json({ success: false, c: 5 });
 	} else if (isEmpty(phases)) {
 		res.json({ success: false, c: 6 });
@@ -175,6 +174,7 @@ export function addWrapper(
 									availableFrom,
 									availableTill,
 									visibleFrom,
+									expiresOn,
 									cost,
 									reward,
 									topic: type === 'TOPIC-MOCK' ? topic : '',
@@ -184,11 +184,15 @@ export function addWrapper(
 									phases: map(phases, (phase) => ({ phase })),
 									analysis: savedWrapperAnalysis._id,
 									tags,
+									onlyCBT,
 								});
-								if (expiry) {
-									assessmentWrapper.expiresOn = expiresOn;
-								}
-								assessmentWrapper.save().then((savedWrapper) => {
+								assessmentWrapper.save().then(async (savedWrapper) => {
+									const newGradeTime = new GradeTimeModel({
+										wrapper: savedWrapper._id,
+										time: availableTill,
+										graded: false,
+									});
+									await newGradeTime.save();
 									core.wrappers.push({ wrapper: savedWrapper._id });
 									core.markModified('wrappers');
 									core.save().then(() => {
@@ -208,3 +212,28 @@ export function addWrapper(
 		});
 	}
 }
+
+export const updateOnlyCBT = (req: ExpressRequest, res: ExpressResponse) => {
+	const { _id, onlyCBT } = req.body;
+
+	let status = true;
+
+	if (!onlyCBT || onlyCBT === 'no') {
+		status = false;
+	}
+
+	AssessmentWrapper.updateOne(
+		{
+			_id,
+		},
+		{
+			$set: {
+				onlyCBT: status,
+			},
+		}
+	)
+		.then((updated) => res.send({ success: true }))
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while updating Only CBT option' })
+		);
+};

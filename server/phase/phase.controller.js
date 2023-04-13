@@ -1,5 +1,5 @@
 const { ObjectId } = require('mongodb');
-const { get, includes, isEmpty, some } = require('lodash');
+const { get, includes, isEmpty, some, forEach, reverse } = require('lodash');
 const { convertArrayToCSV } = require('convert-array-to-csv');
 const Phase = require('./phase.model').default;
 const UEReport = require('./uereport');
@@ -11,6 +11,10 @@ const Submission = require('../assessment/submission.model').default;
 const Leaderboard = require('../leaderboard/leaderboard.model');
 const Client = require('../client/client.model').default;
 const APIError = require('../helpers/APIError');
+const { getClientOfUser } = require('../user/utils/user');
+const { default: logger } = require('../../config/winston');
+const PhaseJeeConfigModel = require('./phaseJeeConfig.model');
+const { default: PhaseMentorModel } = require('./PhaseMentor');
 
 function addphase(req, res) {
 	const {
@@ -57,6 +61,7 @@ function addphaseNew(req, res) {
 		res.json({ success: false, message: 'You do not have required permission' });
 		return;
 	}
+	const isAdminAdding = role === 'admin' || role === 'super';
 	const {
 		name,
 		from,
@@ -66,7 +71,18 @@ function addphaseNew(req, res) {
 		topics,
 		tabs,
 		restrictAccess,
+		forSchool,
+		attendanceType,
+		client,
 	} = req.body;
+
+	const extraSave = {};
+
+	if (isAdminAdding) {
+		if (client) {
+			extraSave.client = client;
+		}
+	}
 
 	SuperGroupModel.get(supergroup).then((supergroup_) => {
 		if (supergroup_) {
@@ -97,18 +113,33 @@ function addphaseNew(req, res) {
 						fullMocks,
 						sectionalMocks,
 						isPrivate: !!restrictAccess,
+						forSchool,
+						attendanceType: forSchool ? attendanceType : 'lecture',
 					});
 					phase.save().then((savedPhase) => {
 						SubGroupModel.update(
 							{ _id: savedGroup._id },
 							{ $push: { phases: { phase: savedPhase._id } } }
 						).then(() => {
-							Client.update(
-								{ moderators: id },
-								{ $push: { phases: savedPhase._id } }
-							).then(() => {
-								res.json({ success: true });
-							});
+							if (!isAdminAdding) {
+								Client.update(
+									{ moderators: id },
+									{ $push: { phases: savedPhase._id } }
+								).then(() => {
+									res.json({ success: true });
+								});
+							} else {
+								if (client) {
+									Client.update(
+										{ _id: client },
+										{ $push: { phases: savedPhase._id } }
+									).then(() => {
+										res.json({ success: true });
+									});
+								} else {
+									res.json({ success: true });
+								}
+							}
 						});
 					});
 				});
@@ -524,6 +555,142 @@ function getUEReport(req, res) {
 	});
 }
 
+async function getPhaseSubjects(req, res) {
+	const { phase } = req.params;
+	const { id, role } = req.payload;
+
+	if (!phase) {
+		res.send({ success: false, msg: 'Phase is not passed' });
+		return;
+	}
+
+	Phase.findById(phase)
+		.populate('subjects')
+		.then((phase) => {
+			if (!phase) {
+				res.send({ success: false, msg: 'Phase not found' });
+				return;
+			}
+			res.send({ success: true, subjects: phase.subjects });
+		})
+		.catch((Err) => {
+			res.send({ success: false, msg: 'Error while fetching subjects' });
+		});
+}
+
+const getPhaseWithSubgroups = async (req, res) => {
+	try {
+		const { id: userId, role } = req.payload;
+
+		const user = await User.findById(userId).populate({
+			path: 'subscriptions.subgroups.phases.phase',
+			select: 'name subgroups',
+			populate: { path: 'subgroups.subgroup', select: 'name' },
+		});
+
+		if (!user) return res.send({ success: false, msg: 'User not found!' });
+
+		if (role === 'moderator') {
+			Client.findOne({ moderators: userId })
+				.populate({
+					path: 'phases',
+					select: 'name subgroups',
+					populate: { path: 'subgroups.subgroup', select: 'name' },
+				})
+				.then((populatedClient) => {
+					if (!populatedClient)
+						res.send({ success: false, msg: 'Client not found!' });
+					else
+						res.send({
+							success: true,
+							phases: reverse(populatedClient ? populatedClient.phases : []),
+						});
+				})
+				.catch((err) =>
+					res.send({ success: false, msg: 'Error while getting phases' })
+				);
+		} else if (role === 'mentor') {
+			const phases = [];
+			forEach(user.subscriptions, (subs) => {
+				forEach(subs.subgroups, (sub) => {
+					forEach(sub.phases, (phs) => {
+						const phase = get(phs, 'phase');
+						if (phase) phases.push(phase);
+					});
+				});
+			});
+			const phaseMentor = await PhaseMentorModel.find({ user: userId }).populate({
+				path: 'phases',
+				select: 'name subgroups',
+				populate: { path: 'subgroups.subgroup', select: 'name' },
+			});
+			forEach(phaseMentor, (ph) => {
+				phases.push(ph.phase);
+			});
+			return res.send({ success: true, phases });
+		} else if (role === 'admin' || role === 'super') {
+			Phase.find({})
+				.select('subgroups name')
+				.sort({ createdAt: -1 })
+				.populate({ path: 'subgroups.subgroup', select: 'name' })
+				.then((phases) => res.send({ success: true, phases }))
+				.catch((err) =>
+					res.send({ success: false, msg: 'Error while fetching phases' })
+				);
+		} else {
+			res.send({
+				success: false,
+				msg: 'you are not authenticated to perform action',
+			});
+		}
+	} catch (err) {
+		console.log(err);
+		logger.info({ err: err.message });
+		return res.send({ success: false, msg: 'Error while processing request' });
+	}
+};
+
+const updatePhaseJeeConfig = async (req, res) => {
+	const { id, config } = req.body;
+	if (!id || !config)
+		return res.send({ success: false, msg: 'Please send proper params!' });
+
+	let exist = await PhaseJeeConfigModel.findOne({ phase: id });
+	if (!exist) {
+		exist = new PhaseJeeConfigModel();
+		exist.phase = id;
+	}
+	exist.studentName = config.studentName;
+	exist.fatherName = config.fatherName;
+	exist.motherName = config.motherName;
+	exist.instituteRollNo = config.instituteRollNo;
+	exist.jeeMainsDOB = config.jeeMainsDOB;
+	exist.jeeRegNoDOB = config.jeeMainsRegNo;
+	exist.jeeMainsRollNo = config.jeeMainsRollNo;
+	exist.jeeMainsMobile = config.jeeMainsMobile;
+	exist.jeeMainsEmail = config.jeeMainsEmail;
+	exist.jeeAdvancedRollNo = config.jeeAdvancedRollNo;
+	exist.jeeAdvancedMobile = config.jeeAdvancedMobile;
+	exist.jeeAdvancedEmail = config.jeeAdvancedEmail;
+	exist.jeeAdvancedDOB = config.jeeAdvancedDOB;
+	exist.save((err) => {
+		if (err) res.send({ success: false, msg: 'Error while updating!' });
+		else res.send({ success: true, msg: 'Successfully saved!' });
+	});
+};
+
+const getPhaseConfig = (req, res) => {
+	const { id } = req.query;
+	PhaseJeeConfigModel.findOne({ phase: id })
+		.then((cfg) => {
+			if (!cfg) res.send({ success: false, msg: 'Config not found!' });
+			else res.send({ success: true, cfg });
+		})
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while fetching config!' })
+		);
+};
+
 module.exports = {
 	addphase,
 	addphaseNew,
@@ -533,4 +700,8 @@ module.exports = {
 	getUEReport,
 	getUsersInPhase,
 	revokeUserAccess,
+	getPhaseSubjects,
+	getPhaseWithSubgroups,
+	updatePhaseJeeConfig,
+	getPhaseConfig,
 };

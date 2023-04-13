@@ -57,13 +57,13 @@ SolutionrequestSchema.post('save', (doc) => {
 	const smtpTransport = nodemailer.createTransport({
 		service: 'gmail',
 		auth: {
-			user: 'support@prepleaf.com',
-			pass: 'bing@prepleafX',
+			user: 'help@prepseed.com',
+			pass: '?fH_XyNx#W$3t!E=',
 		},
 	});
 	const mailOptions = {
-		to: 'hitesh@prepleaf.com',
-		from: 'support@prepleaf.com',
+		to: 'neel@prepseed.com',
+		from: 'help@prepseed.com',
 		subject: 'Solution Request (Important)',
 		text:
 			'Dear Admin\n\n' +
@@ -72,9 +72,9 @@ SolutionrequestSchema.post('save', (doc) => {
 			'\n' +
 			`RequestId: ${doc._id}` +
 			'\n' +
-			'Regards\nPrepleaf Content Manager',
+			'Regards\nPrepseed Content Manager',
 	};
-	smtpTransport.sendMail(mailOptions, function(err) {
+	smtpTransport.sendMail(mailOptions, function (err) {
 		//res.json({success: true})
 	});
 	// }

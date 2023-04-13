@@ -6,7 +6,7 @@ import TokenCache from '../../cache/Token';
 import APIError from '../../helpers/APIError';
 import config from '../../../config/config';
 import { getCookieHostName } from '../../utils/env';
-import { getTokenFromHeaders } from '../../utils/auth';
+import getTokenFromHeaders from '../../utils/auth';
 import { getUserAgentFromRequest } from '../../utils/request';
 
 export async function getMyAccount(req: Request, res: Response) {

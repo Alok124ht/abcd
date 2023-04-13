@@ -1,5 +1,11 @@
 import Joi from 'joi';
 import { EnvironmentConfig } from './EnvironmentConfig';
+import io from 'socket.io-client';
+import logger from './winston';
+import constants from '../server/utils/constants';
+import dayjs from 'dayjs';
+
+const { socket: socketConstants } = constants;
 
 // require and configure dotenv, will load vars in .env in PROCESS.ENV
 require('dotenv').config();
@@ -18,56 +24,18 @@ const envVarsSchema = Joi.object({
 	JWT_SECRET: Joi.string().required().description('JWT Secret required to sign'),
 	MONGO_HOST: Joi.string().required().description('Mongo DB host url'),
 	MONGO_PORT: Joi.number().default(27017),
+	SOCKET_SERVER_BASE: Joi.string().description('Socket Server base is required'),
 })
 	.unknown()
 	.required();
-``;
 
 const { error, value: envVars } = envVarsSchema.validate(process.env);
 if (error) {
 	throw new Error(`Config validation error: ${error.message}`);
 }
 let allowedDomains: (string | RegExp)[] = [
-	'https://makway.prepseed.com',
-	'https://mkway.prepseed.com',
-	'https://reliablekota.prepseed.com',
-	'https://pccp-reliablekota.prepseed.com',
-	'https://brothersacademy.prepseed.com',
-	'https://gckirnapur.prepseed.com',
-	'https://gckiranpur.prepseed.com',
-	'https://mahapragya.prepseed.com',
-	'https://rvparankar.prepseed.com',
-	'https://school.prepseed.com',
-	'https://your-school.prepseed.com',
-	'https://lml.prepseed.com',
-	'https://vimukta.prepseed.com',
-	'https://resonance.prepseed.com',
-	'https://edustation.prepseed.com',
-	'https://kaydee.prepseed.com',
-	'https://gurukul.prepseed.com',
-	'https://gprep.prepseed.com',
-	'https://newtopper.prepseed.com',
-	'https://sciencewing.prepseed.com',
-	'https://privilege.prepseed.com',
-	'https://ciel-knowledge.prepseed.com',
-	'https://master-jee.prepseed.com',
-	'https://aryabhatta-classes.prepseed.com',
-	'https://icon-academy.prepseed.com',
-	'https://ramanujan-jee.prepseed.com',
-	'https://vigyas.prepseed.com',
-	'https://chanakaya-tutorial.prepseed.com',
-	'https://unchaai.prepseed.com',
-	'https://coaching.prepseed.com',
-	'https://college.prepseed.com',
-	'https://mantraprayas.prepseed.com',
-	'https://dakshana.prepseed.com',
-	'https://bothraclasses.prepseed.com',
-	'https://dashboard.prepseed.com',
-	'https://admin.prepseed.com',
-	'https://prepseed.com',
-	'https://www.prepseed.com',
-	'https://scientia.prepseed.com',
 	'https://prepare.vyasedification.com',
+	/^https:\/\/[a-zA-Z0-9.\-]*prepseed.com$/,
 ];
 if (envVars.NODE_ENV === 'development') {
 	allowedDomains = [/(.)*/, /(.)*localhost:[0-9]+/];
@@ -99,6 +67,87 @@ const config: EnvironmentConfig = {
 	cors: {
 		allowedDomains,
 	},
+	zoom: {
+		clientId: `${process.env.ZOOM_CLIENT_ID}`,
+		clientSecret: `${process.env.ZOOM_CLIENT_SECRET}`,
+		sdkKey: `${process.env.ZOOM_SDK_KEY}`,
+		sdkSecret: `${process.env.ZOOM_SDK_SECRET}`,
+	},
+	socketBase: `${process.env.SOCKET_SERVER_BASE}`,
+	socket: io(`${process.env.SOCKET_SERVER_BASE}`),
+	aws: {
+		general: {
+			accessId: `${process.env.GENERAL_AWS_ACCESS_KEY_ID}`,
+			secretKey: `${process.env.GENERAL_AWS_SECRET_ACCESS_KEY}`,
+		},
+	},
 };
+
+const { socket } = config;
+
+const reconnectSocket = () => {
+	socket.connect();
+};
+
+socket.on('disconnect', (reason, description) => {
+	logger.warn(
+		`Message: Socket disconnected, Reason: ${reason}, Description: ${description}`
+	);
+	reconnectSocket();
+});
+
+socket.on('connect_error', (err) => {
+	logger.error(
+		`Message: Socket disconnected, Error Name: ${err.message}, Error Message: ${err.message}`
+	);
+	reconnectSocket();
+});
+
+socket.on('connect', () => {
+	const { addClient } = socketConstants;
+	logger.info(`Message: Socket Connected on ${dayjs().toString()}`);
+	socket.emit(addClient, {
+		device: 'Server',
+		deviceId: 'Root',
+		socketId: socket.id,
+	});
+});
+
+const { io: socketIO } = socket;
+
+socketIO.on('close', (reason, description) => {
+	logger.error(
+		`Message: Connection to socket is closed, Reason: ${reason}, Description: ${description}`
+	);
+});
+
+socketIO.on('error', (err) => {
+	logger.error(
+		`Message: Error in connection, Error name: ${err.name} Error message: ${err.message}`
+	);
+});
+
+socketIO.on('reconnect', (attempt) => {
+	logger.error(
+		`Message: Socket tried to reconnect, reconnectAttempt: ${attempt} `
+	);
+});
+
+socketIO.on('reconnect_attempt', (attempt) => {
+	logger.error(`
+		Message: Socket tried to reconnect_attempt,
+		reconnectAttempt: ${attempt},
+	`);
+});
+
+socketIO.on('reconnect_error', (err) => {
+	logger.error(
+		`Message: Socket Reconnect Error, Error name: ${err.name}, Error message:${err.message}`
+	);
+});
+
+socketIO.on('reconnect_failed', () => {
+	logger.error(`Message: 'Socket Reconnect Failed`);
+});
 
 export = config;

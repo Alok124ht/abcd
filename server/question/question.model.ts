@@ -11,6 +11,7 @@ import {
 import { QuestionType, QuestionTypes } from './QuestionType';
 import { QuerySelector } from 'mongodb';
 import { isTypeTransitionPossible } from './util/typeTransition';
+import { isArray } from 'lodash';
 
 const { ObjectId, Mixed } = Schema.Types;
 
@@ -596,7 +597,8 @@ QuestionSchema.statics = {
 			query.isPublished = false;
 			// query.used = null;
 			query['solution.rawContent'] = {
-				$not: /{\"blocks\":\[{\"key\":\"[a-zA-Z0-9]+\",\"text\":\"\",\"type\":\"unstyled\",\"depth\":0,\"inlineStyleRanges\":\[\],\"entityRanges\":\[\],\"data\":{}}],\"entityMap\":{}}/,
+				$not:
+					/{\"blocks\":\[{\"key\":\"[a-zA-Z0-9]+\",\"text\":\"\",\"type\":\"unstyled\",\"depth\":0,\"inlineStyleRanges\":\[\],\"entityRanges\":\[\],\"data\":{}}],\"entityMap\":{}}/,
 			};
 		} else if (questionState === 'NOT-VERIFIED-PUBLISHED') {
 			query.verifiedBy = '';
@@ -604,7 +606,8 @@ QuestionSchema.statics = {
 			query.isPublished = true;
 		} else if (questionState === 'WITHOUT-SOLUTION') {
 			query['solution.rawContent'] = {
-				$regex: /{\"blocks\":\[{\"key\":\"[a-zA-Z0-9]+\",\"text\":\"\",\"type\":\"unstyled\",\"depth\":0,\"inlineStyleRanges\":\[\],\"entityRanges\":\[\],\"data\":{}}],\"entityMap\":{}}/,
+				$regex:
+					/{\"blocks\":\[{\"key\":\"[a-zA-Z0-9]+\",\"text\":\"\",\"type\":\"unstyled\",\"depth\":0,\"inlineStyleRanges\":\[\],\"entityRanges\":\[\],\"data\":{}}],\"entityMap\":{}}/,
 			};
 		} else if (questionState === 'REPORTED') {
 			query.reports = { $nin: [[]] };
@@ -976,10 +979,19 @@ QuestionSchema.virtual('getOptions').get(function getOptions(
 	this: IQuestion
 ): QuestionOption[] {
 	if (this.dataType === 'image') {
-		if (!Array.isArray(this.options) || this.options.length === 0) {
-			this.options = [{}, {}, {}, {}];
+		let localOptions: any[] = [];
+		if (this.options && isArray(this.options) && this.options.length !== 0) {
+			localOptions = this.options;
+		} else if (
+			this.multiOptions &&
+			isArray(this.multiOptions) &&
+			this.multiOptions.length !== 0
+		) {
+			localOptions = this.multiOptions;
+		} else {
+			localOptions = [{}, {}, {}, {}];
 		}
-		return this.options.map((option, index) => {
+		return localOptions.map((option, index) => {
 			let rawContent;
 			try {
 				rawContent = JSON.parse(option.content.rawContent);
@@ -1001,8 +1013,13 @@ QuestionSchema.virtual('getOptions').get(function getOptions(
 				content: { rawContent: JSON.stringify(modifiedContent) },
 			};
 		});
+	} else {
+		if (this.options && isArray(this.options) && this.options.length !== 0) {
+			return this.options;
+		} else {
+			return this.multiOptions;
+		}
 	}
-	return this.options;
 });
 
 export default model<IQuestion, QuestionModel>('Question', QuestionSchema);

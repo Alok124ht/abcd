@@ -8,6 +8,10 @@ import {
 	updateusers,
 	getUEReport,
 	getUsersInPhase,
+	getPhaseSubjects,
+	getPhaseWithSubgroups,
+	getPhaseConfig,
+	updatePhaseJeeConfig,
 } from './phase.controller';
 import { withPhases, createWithUserSearch } from './middlewares';
 import auth from '../middleware/auth';
@@ -18,6 +22,8 @@ import { getPhases, updatePhase } from './controllers/admin/crud';
 const phaseRouter = Router();
 
 phaseRouter.use('/mentor', phaseMentorRouter);
+
+phaseRouter.route('/get/:phase').get(auth.required, getPhaseSubjects);
 
 phaseRouter
 	.route('/get')
@@ -41,5 +47,12 @@ phaseRouter.route('/updateusers/:phase').get(updateusers);
 
 phaseRouter.route('/getuereport/:phase').get(getUEReport);
 phaseRouter.route('/users/:phase').get(getUsersInPhase);
+phaseRouter
+	.route('/get-phases-with-subgroups')
+	.get(auth.required, getPhaseWithSubgroups);
+phaseRouter
+	.route('/phase-config')
+	.get(auth.required, getPhaseConfig)
+	.post(auth.required, updatePhaseJeeConfig);
 
 export default phaseRouter;

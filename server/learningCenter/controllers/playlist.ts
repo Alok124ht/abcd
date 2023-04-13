@@ -15,6 +15,7 @@ import { isAtLeast } from '../../utils/user/role';
 import { UserRole } from '../../user/IUser';
 import UserVideoStat from '../models/UserVideoStat';
 import { parseAsString } from '../../utils/query';
+import { getAllMentorAndModeratorsIds } from '../../client/client.controller';
 var mongoose = require('mongoose');
 
 const { ObjectId } = Types;
@@ -245,7 +246,10 @@ export const addItemsToPlaylist = (req: Request, res: Response) => {
 						availableFromByPhase,
 						availableTillByPhase,
 						resource,
-						resourceModel: playlist.resourceType,
+						resourceModel:
+							playlist.resourceType === 'Book'
+								? 'ResourceDocument'
+								: playlist.resourceType,
 						createdBy: userId,
 					};
 				}),
@@ -421,6 +425,15 @@ export const getMyPlaylists = async (req: Request, res: Response) => {
 					item: ObjectId(userId),
 				},
 			];
+			if (role === 'moderator') {
+				const users = await getAllMentorAndModeratorsIds(userId);
+				users.forEach((user) => {
+					orCondition.push({
+						itemType: 'User',
+						item: ObjectId(user),
+					});
+				});
+			}
 			if (Array.isArray(groupIdsOfUser) && groupIdsOfUser.length) {
 				orCondition.push({
 					itemType: 'UserGroup',
@@ -433,6 +446,9 @@ export const getMyPlaylists = async (req: Request, res: Response) => {
 				},
 			};
 		}
+	}
+	if (role !== 'super' && role !== 'admin') {
+		query.isArchived = { $ne: true };
 	}
 	PlaylistModel.find(query)
 		.sort({ _id: -1 })
@@ -537,4 +553,41 @@ export const getVideoProgress = async (req: Request, res: Response) => {
 		},
 	]);
 	res.send(stats);
+};
+
+export const toggleVisibility = (req: Request, res: Response) => {
+	const { role } = req.payload;
+	const { status, id } = req.body;
+
+	if (
+		role !== 'super' &&
+		role !== 'admin' &&
+		role !== 'moderator' &&
+		role !== 'mentor'
+	) {
+		res.send({ success: false, msg: "You don't have access to archive" });
+		return;
+	}
+
+	if (status === undefined || !id) {
+		res.send({ success: false, msg: 'Please send all arguments' });
+		return;
+	}
+
+	PlaylistModel.updateOne(
+		{
+			_id: id,
+		},
+		{
+			$set: {
+				isArchived: status,
+			},
+		}
+	)
+		.then((updated) => {
+			res.send({ success: true, msg: 'Visibility Updated' });
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: 'Unable to change visibility' });
+		});
 };

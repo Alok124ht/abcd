@@ -4,22 +4,9 @@ import { Lecture, LectureModelInterface } from '../../types/Lecture';
 
 const LectureSchema = new Schema(
 	{
-		phase: {
-			type: Schema.Types.ObjectId,
-			ref: 'Phase',
-			required: true,
-		},
-		subject: {
-			type: Schema.Types.ObjectId,
-			ref: 'Subject',
-			required: true,
-		},
-		lecturers: [
-			{
-				type: Schema.Types.ObjectId,
-				ref: 'User',
-			},
-		],
+		phase: { type: Schema.Types.ObjectId, ref: 'Phase', required: true },
+		subject: { type: Schema.Types.ObjectId, ref: 'Subject', required: true },
+		lecturers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
 		date: { type: Date, required: true },
 		label: String,
 		stats: {
@@ -30,10 +17,7 @@ const LectureSchema = new Schema(
 			[AttendanceStatus.CasualLeave]: Number,
 			[AttendanceStatus.SickLeave]: Number,
 		},
-		createdBy: {
-			type: Schema.Types.ObjectId,
-			ref: 'User',
-		},
+		createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
 	},
 	{ timestamps: true }
 );

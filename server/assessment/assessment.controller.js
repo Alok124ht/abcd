@@ -1,6 +1,19 @@
-const { concat, forEach } = require('lodash');
+/* eslint-disable camelcase */
+/* eslint-disable prefer-const */
+/* eslint-disable no-plusplus */
+/* eslint-disable block-scoped-var */
+/* eslint-disable no-redeclare */
+/* eslint-disable no-var */
+/* eslint-disable no-loop-func */
+/* eslint-disable vars-on-top */
+/* eslint-disable no-param-reassign */
+/* eslint-disable linebreak-style */
+/* eslint-disable import/extensions */
+/* eslint-disable import/no-unresolved */
+const { concat, forEach, toString, trim, get } = require('lodash');
 const mongoose = require('mongoose');
 const { convertArrayToCSV } = require('convert-array-to-csv');
+const dayjs = require('dayjs');
 const AssessmentCore = require('./assessmentCore.model').default;
 const AssessmentWrapper = require('./assessmentWrapper.model').default;
 const CoreAnalysis = require('./coreAnalysis.model').default;
@@ -18,6 +31,7 @@ const {
 	secureCoreAnalysis,
 	getRanking,
 	selectQuestions,
+	getCorrectOptions,
 } = require('./lib');
 const Log = require('../log/log.model');
 const Draft = require('../draft/draft.model');
@@ -42,6 +56,12 @@ const {
 const { updateCategory } = require('./categoryLib');
 const { isAtLeast } = require('../utils/user/role');
 const { getActivePhasesFromSubscriptions } = require('../utils/phase');
+const { default: questionModel } = require('../question/question.model');
+const { default: ServicePlan } = require('../models/ServicePlan');
+const { default: UserModel } = require('../user/user.model');
+const { UserRole } = require('../user/IUser');
+const { default: UserLiveAssessment } = require('../user/UserLiveAssessment');
+const { dateToStartTime, dateToEndTime } = require('../utils/date');
 
 const { ObjectId } = mongoose.Types;
 
@@ -872,7 +892,7 @@ function getResponseTimeCategory(response, question) {
 	// confirm this from saharan
 	let category = 'perfect';
 
-	const q = question.statistics.perfectTimeLimits;
+	const q = get(question, 'statistics.perfectTimeLimits', null);
 
 	if (q && q.min !== undefined) {
 		if (response.time / 1000.0 < q.min) category = 'wasted';
@@ -955,7 +975,7 @@ function getGradedStats(submission) {
 
 				if (f.state === 3 || f.state === 4) questionsAttempted += 1;
 
-				if (question.statistics.medianTime) {
+				if (question && question.statistics && question.statistics.medianTime) {
 					timeToughness = question.statistics.medianTime;
 				} else if (questionStats.times.length) {
 					questionStats.times.sort();
@@ -1107,13 +1127,22 @@ function getGrades(req, res) {
 	// send total marks and maxMarks only, if assessment is not graded yet
 	// check user
 	// send only reports of current user
-	const { submissionId, hideQuestions, fetchSubmission } = req.body;
+	const { submissionId, hideQuestions, fetchSubmission, user } = req.body;
 	const questionProps = hideQuestions
 		? 'level reports options multiOptions range integerAnswer type statistics answers'
 		: 'options multiOptions range integerAnswer type content dataType link hint solution solSubmittedBy reports level statistics answers';
 
+	let toSearch = req.payload.id;
+
+	if (req.payload.role !== 'user') {
+		toSearch = user;
+	}
+
 	if (fetchSubmission) {
-		Submission.findOne({ _id: submissionId, user: req.payload.id })
+		Submission.findOne({
+			_id: submissionId,
+			user: toSearch,
+		})
 			.populate([
 				{ path: 'coreAnalysis' },
 				{ path: 'wrapperAnalysis' },
@@ -1177,7 +1206,7 @@ function getGrades(req, res) {
 			});
 	} else {
 		Submission.findOne(
-			{ _id: ObjectId(submissionId), user: ObjectId(req.payload.id) },
+			{ _id: ObjectId(submissionId), user: ObjectId(toSearch) },
 			{
 				coreAnalysis: 1,
 				wrapperAnalysis: 1,
@@ -1225,16 +1254,16 @@ async function getAnalysis(req, res) {
 	// can use cache!!!
 	// send total marks and maxMarks only, if assessment is not graded yet
 	// check user //send only reports of current user
-	const { wrapperId, fetchSubmission } = req.body;
+	const { wrapperId, fetchSubmission, userId } = req.body;
 
 	if (fetchSubmission) {
 		const count = await Submission.countDocuments({
 			assessmentWrapper: ObjectId(wrapperId),
-			user: ObjectId(req.payload.id),
+			user: ObjectId(userId),
 		});
 		Submission.findOne({
 			assessmentWrapper: ObjectId(wrapperId),
-			user: ObjectId(req.payload.id),
+			user: ObjectId(userId),
 		})
 			.skip(count - 1)
 			.populate([
@@ -1294,7 +1323,7 @@ async function getAnalysis(req, res) {
 			});
 	} else {
 		Submission.findOne(
-			{ assessmentWrapper: ObjectId(wrapperId), user: ObjectId(req.payload.id) },
+			{ assessmentWrapper: ObjectId(wrapperId), user: ObjectId(userId) },
 			{
 				coreAnalysis: 1,
 				wrapperAnalysis: 1,
@@ -1340,7 +1369,7 @@ async function getAnalysis(req, res) {
 	}
 }
 
-function questionRatingData(req, res) {
+function questionRatingData(res) {
 	res.json({ success: true });
 }
 
@@ -1479,7 +1508,7 @@ function update(req, res) {
 			sections.forEach((sec) => {
 				let found = -1;
 				assessmentCore.sections.forEach((s, idx) => {
-					if (s._id == sec._id) found = idx;
+					if (toString(s._id) === toString(sec._id)) found = idx;
 				});
 				if (found === -1) {
 					// eslint-disable-next-line no-console
@@ -1636,7 +1665,7 @@ function updateDates(req, res, next) {
 		api: `assessment${req.url}`,
 		params: req.body,
 	});
-	const { id, availableFrom, availableTill, visibleFrom } = req.body;
+	const { id, availableFrom, availableTill, visibleFrom, expiresOn } = req.body;
 	AssessmentWrapper.findById(id)
 		.exec()
 		.then((assessmentWrapper) => {
@@ -1651,6 +1680,9 @@ function updateDates(req, res, next) {
 				}
 				if (visibleFrom) {
 					assessmentWrapper.set('visibleFrom', visibleFrom);
+				}
+				if (expiresOn) {
+					assessmentWrapper.set('expiresOn', expiresOn);
 				}
 				assessmentWrapper.save().then(() => {
 					res.json({});
@@ -1674,7 +1706,7 @@ function renameWrappers(wrappers, phase) {
 		let newavailablefrom = wrapper.availableFrom;
 		let newexpireson = wrapper.expiresOn;
 		wrapper.phases.forEach((p) => {
-			if (p.phase.toString() == phase) {
+			if (p.phase.toString() === phase) {
 				if (p.name) newname = p.name;
 				if (p.slang) newslang = p.slang;
 				if (p.availableFrom) newavailablefrom = p.availableFrom;
@@ -1689,13 +1721,38 @@ function renameWrappers(wrappers, phase) {
 	return wrappers;
 }
 
-const getwrappers = (req, res) => {
+const getwrappers = async (req, res) => {
 	const { phase } = req.params;
 	const today = new Date();
+	const phases = [phase];
+	const userToSearch =
+		req.payload.role === 'parent' ? req.query.userId : req.payload.id;
+	const user = await User.findById(userToSearch).select('oldPhases');
+	if (!user) return res.send({ success: false, msg: 'User not found!' });
+	forEach(get(user, 'oldPhases', []), (value) => {
+		phases.push(value);
+	});
+	const services = [];
+	const service = await ServicePlan.find({
+		'visibleIn.value': { $in: phases },
+	});
+	service.forEach((value) => {
+		value.services.forEach((val) => {
+			services.push(val);
+		});
+	});
 	AssessmentWrapper.find(
 		{
-			'phases.phase': phase,
-			visibleFrom: { $lte: today },
+			$or: [
+				{
+					'phases.phase': { $in: phases },
+					visibleFrom: { $lte: today },
+				},
+				{
+					visibleForServices: { $in: services },
+					visibleFrom: { $lte: today },
+				},
+			],
 		},
 		{
 			core: 1,
@@ -1720,6 +1777,7 @@ const getwrappers = (req, res) => {
 			visibleForServices: 1,
 			series: 1,
 			tags: 1,
+			onlyCBT: 1,
 		}
 	)
 		.populate([
@@ -1815,7 +1873,7 @@ const getwrappertoppers = (req, res) => {
 						});
 						const data = toppers.map((t, i) => ({
 							user: {
-								username: userMap[t.user] ? userMap[t.user].username : 'Prepleaf-User',
+								username: userMap[t.user] ? userMap[t.user].username : 'Prepseed-User',
 								dp: userMap[t.user] ? userMap[t.user].dp : '',
 								rank: i + 1,
 							},
@@ -1833,11 +1891,15 @@ const getwrappertoppers = (req, res) => {
 
 const getsubmissions = (req, res) => {
 	const {
-		payload: { id },
-		body: { wrapperIds },
+		payload: { id, role },
+		body: { wrapperIds, userId },
 	} = req;
+	let userToSearch = id;
+	if (role === 'parent') {
+		userToSearch = userId;
+	}
 	Submission.find(
-		{ user: id, assessmentWrapper: { $in: wrapperIds } },
+		{ user: userToSearch, assessmentWrapper: { $in: wrapperIds } },
 		{ assessmentWrapper: 1, graded: 1, createdAt: 1, live: 1 }
 	)
 		.then((submissions) => {
@@ -1870,7 +1932,7 @@ function getCommonPhases(userPhases, assessmentWrapperPhases) {
 	return commonPhases;
 }
 
-function migrateleaderboard2(req, res) {
+function migrateleaderboard2(res) {
 	Submission.find({ graded: true })
 		// .limit(10)
 		.populate('assessmentWrapper user')
@@ -1895,12 +1957,12 @@ function migrateleaderboard2(req, res) {
 					let found2 = false;
 					leaderboards[phase].assessments.forEach((assessment, idx) => {
 						if (
-							assessment.wrapper.toString() ==
+							assessment.wrapper.toString() ===
 							submission.assessmentWrapper._id.toString()
 						) {
 							found = idx;
 							assessment.submissions.forEach((s) => {
-								if (s.submission.toString() == submission._id.toString()) {
+								if (s.submission.toString() === submission._id.toString()) {
 									found2 = true;
 								}
 							});
@@ -2035,68 +2097,108 @@ function getmarks(req, res, next) {
 		res.json({ success: false });
 		return;
 	}
-	AssessmentWrapper.findOne({ _id: req.params.wrapperId }, { core: 1 })
-		.populate({ path: 'core', select: 'sections sectionGroups' })
-		.then((assessmentWrapper) => {
-			if (!assessmentWrapper || !assessmentWrapper.core) {
-				next(new APIError('Wrapper not found', 422, true));
-			} else {
-				const maxMarks = getMaxMarks(assessmentWrapper.core);
-
-				Submission.find(
-					{ assessmentWrapper: req.params.wrapperId, graded: true },
-					{ user: 1, meta: 1, createdAt: 1 }
-				)
-					.populate([
-						{
-							path: 'user',
-							select: '_id username email mobileNumber subscriptions',
-							populate: [
-								{ path: 'subscriptions.subgroups.phases.phase', select: 'name' },
-							],
-						},
-					])
-					.then((submissions) => {
-						if (submissions.length) {
-							const rows = [
-								[
-									'Submission Id',
-									'Created At',
-									'Username',
-									'Email',
-									'Mobile Number',
-									'Phase',
-									'Max Marks',
-									'Marks',
+	try {
+		AssessmentWrapper.findOne({ _id: req.params.wrapperId }, { core: 1 })
+			.populate({ path: 'core', select: 'sections sectionGroups' })
+			.then((assessmentWrapper) => {
+				if (!assessmentWrapper || !assessmentWrapper.core) {
+					next(new APIError('Wrapper not found', 422, true));
+				} else {
+					const maxMarks = getMaxMarks(assessmentWrapper.core);
+					Submission.find(
+						{ assessmentWrapper: req.params.wrapperId, graded: true },
+						{ user: 1, meta: 1, createdAt: 1 }
+					)
+						.populate([
+							{
+								path: 'user',
+								select: '_id username email mobileNumber subscriptions',
+								populate: [
+									{ path: 'subscriptions.subgroups.phases.phase', select: 'name' },
 								],
-							];
-							submissions[0].meta.sections.forEach((s) => {
-								rows[0].push(`${s.name} marks`);
-							});
-							submissions.forEach((s) => {
-								const phaseName = getPhaseName(s.user.subscriptions);
-								const row = [
-									s._id,
-									new Date(s.createdAt),
-									s.user.username,
-									s.user.email,
-									s.user.mobileNumber,
-									phaseName,
-									maxMarks,
-									s.meta.marks,
+							},
+						])
+						.then((submissions) => {
+							if (submissions && submissions.length && submissions.length > 0) {
+								const rows = [
+									[
+										'Submitted On',
+										'Username',
+										'Email',
+										'Mobile Number',
+										'Phase',
+										'Attempted Questions',
+										'Correct Questions',
+										'Incorrect Questions ',
+										'Marks Gained',
+										'Marks Lost',
+										'Actual Marks',
+									],
 								];
-								s.meta.sections.forEach((ss) => {
-									row.push(ss.marks);
+								submissions[0].meta.sections.forEach((s, key) => {
+									rows[0].push(
+										`${s.name ? s.name : `Section ${key + 1}`} Positive marks`
+									);
+									rows[0].push(
+										`${s.name ? s.name : `Section ${key + 1}`} Negative marks`
+									);
+									rows[0].push(`${s.name ? s.name : `Section ${key + 1}`} Total marks`);
 								});
-								rows.push(row);
-							});
-							res.json({ success: true, csv: convertArrayToCSV(rows) });
-						}
-					})
-					.catch(next);
-			}
-		})
-		.catch(next);
+								rows[0].push('Total Marks');
+								rows[0].push('Max Marks');
+								submissions.forEach((s) => {
+									console.log('in submission');
+									const phaseName = getPhaseName(s.user.subscriptions);
+									const row = [
+										dayjs(s.createdAt).format('ddd, MMM D, YYYY h:mm A').toString(),
+										s.user.username,
+										s.user.email,
+										s.user.mobileNumber,
+										phaseName,
+										s.meta.questionsAttempted,
+										s.meta.correctQuestions,
+										s.meta.incorrectQuestions,
+										s.meta.marks - s.meta.marksLost,
+										s.meta.marksLost,
+										s.meta.marks,
+									];
+									s.meta.sections.forEach((ss) => {
+										let positiveMarks = 0;
+										let negativeMarks = 0;
+										ss.questions.forEach((que) => {
+											if (que.mark >= 0) {
+												positiveMarks += que.mark;
+											} else {
+												negativeMarks += que.mark;
+											}
+										});
+										row.push(positiveMarks);
+										row.push(negativeMarks);
+										row.push(positiveMarks + negativeMarks);
+									});
+									row.push(s.meta.marks);
+									row.push(maxMarks);
+									rows.push(row);
+								});
+								res.json({ success: true, csv: convertArrayToCSV(rows) });
+							} else {
+								res.json({ success: false });
+							}
+						})
+						.catch(next);
+				}
+			})
+			.catch(next);
+	} catch (err) {
+		sendEmail({
+			subject: 'Get marks error',
+			to: 'neel@prepseed.com',
+			from: 'help@prepseed.com',
+			body: err,
+			bodyType: 'text',
+		});
+		res.json({ success: false });
+	}
 }
 
 function updateBonus(req, res) {
@@ -2283,57 +2385,80 @@ function generateSectionInstructions(instructions) {
 			});
 		}
 
-		const marking = parseInt(instruction.marks, 10);
-		if (marking === 1) {
+		const { marking } = instruction;
+
+		if (marking.scheme === 'partial') {
 			sectionInstructions[i].markingScheme.push({
-				text:
-					'Full Marks : +3 If only the option corresponding to the correct answer is selected.',
+				text: `Full Marks : +${marking.positive} If only (all) the correct option(s) is (are) chosen.`,
 			});
-			sectionInstructions[i].markingScheme.push({
-				text: 'Zero Marks : 0 If none of the options is selected.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text: 'Negative Marks : –1 In all other cases',
-			});
-		} else if (marking === 2) {
-			sectionInstructions[i].markingScheme.push({
-				text:
-					'Full Marks : +4 If only (all) the correct option(s) is (are) chosen.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text:
-					'Partial Marks : +3 If all the four options are correct but ONLY three options are chosen.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text:
-					'Partial Marks : +2 If three or more options are correct but ONLY two correct options are chosen.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text:
-					'Partial Marks : +1 If two or more options are correct but ONLY one correct option is chosen.',
-			});
+
+			if (marking.positive - 1 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 1
+					} If all four options are correct but ONLY three correct options are chosen.`,
+				});
+			}
+			if (marking.positive - 2 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 2
+					} If three or more options are correct but ONLY two correct options are chosen.`,
+				});
+			} else if (marking.positive - 1 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 1
+					} If three or more options are correct but ONLY two correct options are chosen.`,
+				});
+			} else {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : ${marking.negative} If three or more options are correct but ONLY two correct options are chosen.`,
+				});
+			}
+			if (marking.positive - 3 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 3
+					} If two or more options are correct but ONLY one correct option is chosen.`,
+				});
+			} else if (marking.positive - 2 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 2
+					} If two or more options are correct but ONLY one correct option is chosen.`,
+				});
+			} else if (marking.positive - 1 > 0) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : +${
+						marking.positive - 1
+					} If two or more options are correct but ONLY one correct option is chosen.`,
+				});
+			} else {
+				sectionInstructions[i].markingScheme.push({
+					text: `Partial Marks : ${marking.negative} If two or more options are correct but ONLY one correct option is chosen.`,
+				});
+			}
 			sectionInstructions[i].markingScheme.push({
 				text:
 					'Zero Marks : 0 If none of the options is chosen (i.e. the question is unanswered).',
 			});
+			if (marking.negative) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Negative Marks : ${marking.negative} In all other cases.`,
+				});
+			}
+		} else {
 			sectionInstructions[i].markingScheme.push({
-				text: 'Negative Marks : -2 In all other cases.',
+				text: `Full Marks : +${marking.positive} If only the option corresponding to the correct answer is selected.`,
 			});
-		} else if (marking === 3) {
+			if (marking.negative) {
+				sectionInstructions[i].markingScheme.push({
+					text: `Negative Marks : ${marking.negative} If any of the option corresponding to the incorrect answer is selected`,
+				});
+			}
 			sectionInstructions[i].markingScheme.push({
-				text:
-					'Full Marks : +3 If ONLY the correct numerical value is entered as answer.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text: 'Zero Marks : 0 In all other cases.',
-			});
-		} else if (marking === 4) {
-			sectionInstructions[i].markingScheme.push({
-				text:
-					'Full Marks : +4 If ONLY the correct numerical value is entered as answer.',
-			});
-			sectionInstructions[i].markingScheme.push({
-				text: 'Zero Marks : 0 In all other cases.',
+				text: 'Zero Marks : 0 If none of the options is selected.',
 			});
 		}
 	});
@@ -2478,31 +2603,22 @@ function updateGradeTime(req, res) {
 			}
 		});
 	} else {
-		GradeTime.find({
-			time: {
-				$gt: new Date(new Date(gradeTime) - 10 * 60 * 1000),
-				$lt: new Date(new Date(gradeTime) + 10 * 60 * 1000),
-			},
-		}).then((gts) => {
-			if (gts.length) {
-				res.json({ success: false, msg: 'Grade time conflict', gts });
+		GradeTime.findOne({ wrapper: ObjectId(wrapperId) }).then((gt) => {
+			if (gt) {
+				gt.time = gradeTime;
+				gt.graded = false;
+				gt.markModified('time');
+				gt.markModified('graded');
+				gt.save().then(() => {
+					res.json({ success: true, msg: 'Grade time updated successfully.' });
+				});
 			} else {
-				GradeTime.findOne({ wrapper: ObjectId(wrapperId) }).then((gt) => {
-					if (gt) {
-						gt.time = gradeTime;
-						gt.markModified('time');
-						gt.save().then(() => {
-							res.json({ success: true, msg: 'Grade time updated successfully.' });
-						});
-					} else {
-						const gt_ = new GradeTime({
-							wrapper: ObjectId(wrapperId),
-							time: gradeTime,
-						});
-						gt_.save().then(() => {
-							res.json({ success: true, msg: 'Grade time set successfully.' });
-						});
-					}
+				const gt_ = new GradeTime({
+					wrapper: ObjectId(wrapperId),
+					time: gradeTime,
+				});
+				gt_.save().then(() => {
+					res.json({ success: true, msg: 'Grade time set successfully.' });
 				});
 			}
 		});
@@ -2754,6 +2870,359 @@ function toggleHide(req, res) {
 	});
 }
 
+async function getWrapperFormat(req, res) {
+	let { assessmentId } = req.params;
+	const { type } = req.query;
+	if (!assessmentId) {
+		res.json({ success: false, msg: 'Assessment Id is not set' });
+		return;
+	}
+	if (type === 'wrapper') {
+		const wrapper = await AssessmentWrapper.findById(ObjectId(assessmentId));
+		if (!wrapper) {
+			res.json({ success: false, msg: 'Wrapper not found' });
+			return;
+		}
+		assessmentId = wrapper.core;
+	}
+	AssessmentCore.findById(ObjectId(assessmentId))
+		.select('sections.questions')
+		.populate({
+			path: 'sections.questions.question',
+			select: 'type options.isCorrect integerAnswer range multiOptions.isCorrect',
+		})
+		.then(async (assessment) => {
+			if (!assessment) {
+				res.json({ success: false, msg: "Can't find assessment" });
+			} else {
+				const data = [];
+				assessment.sections.forEach((section) => {
+					section.questions.forEach((question) => {
+						let answer = '';
+						switch (question.question.type) {
+							case 'MULTIPLE_CHOICE_SINGLE_CORRECT' ||
+								'LINKED_MULTIPLE_CHOICE_SINGLE_CORRECT':
+								answer = getCorrectOptions(question.question.options, false);
+								break;
+							case 'MULTIPLE_CHOICE_MULTIPLE_CORRECT' ||
+								'LINKED_MULTIPLE_CHOICE_MULTIPLE_CORRECT':
+								answer = getCorrectOptions(question.question.multiOptions, true);
+								break;
+							case 'INTEGER':
+								answer = question.question.integerAnswer;
+								break;
+							case 'RANGE' || 'LINKED_RANGE':
+								answer = `${question.question.range.start} to ${question.question.range.end}`;
+								break;
+							default:
+								answer = '';
+								break;
+						}
+						data.push({
+							correctMark: question.correctMark,
+							incorrectMark: question.incorrectMark,
+							type: question.question.type,
+							correctOption: toString(answer),
+							topic: question.topic,
+							sub_topic: question.sub_topic,
+						});
+					});
+				});
+				res.send(data);
+			}
+		})
+		.catch((err) => {
+			res.status(500).send({ err });
+		});
+}
+
+async function getRandomQuestion(req, res) {
+	const { topic, sub_topic, type, level, specific, length } = req.body;
+	if (!topic || !sub_topic || !length || !type) {
+		res.send({
+			success: false,
+			message: 'Topic, subtopic, type and length are required',
+		});
+		return;
+	}
+	const questions = await questionModel
+		.find({
+			topic,
+			sub_topic,
+			type,
+			level: level || [1, 2, 3],
+		})
+		.select('type level');
+	if (questions.length < length) {
+		res.send({
+			success: false,
+			message: `We have only ${questions.length} questions for the conditions you have selected`,
+		});
+		return;
+	}
+	const indexes = [];
+	const selected = [];
+	if (!specific) {
+		for (var i = 0; i < length; ) {
+			const random = Math.ceil(Math.random() * questions.length);
+			if (!indexes.includes(random)) {
+				indexes.push(random);
+				i++;
+			}
+		}
+		for (var i = 0; i < indexes.length; i++) {
+			selected.push(questions[indexes[i]]);
+		}
+	} else {
+		for (var i = 0; i < specific.length; i++) {
+			if (!specific[i].type || !specific[i].questions) {
+				res.send({
+					success: false,
+					message: 'Specification of types is not set appropriate',
+				});
+				return;
+			}
+			const indexesTemp = [];
+			const currentQuestions = questions.filter(
+				(que) => que.type === specific[i].type
+			);
+			for (
+				var j = 0;
+				j < specific[i].questions && currentQuestions.length !== 0;
+
+			) {
+				const random = Math.ceil(Math.random() * currentQuestions.length);
+				if (!indexesTemp.includes(random)) {
+					indexesTemp.push(random);
+					j++;
+				}
+			}
+			for (var j = 0; j < indexesTemp.length; j++) {
+				selected.push(currentQuestions[indexesTemp[i]]);
+			}
+		}
+	}
+	res.send({
+		selected,
+		length: selected.length,
+	});
+}
+
+const getAssementSubmissionDetails = (req, res) => {
+	const { wrapperId, userId } = req.body;
+	if (!wrapperId || !userId) {
+		res.send({ success: false, message: 'Wrapper Id or userId are not sent' });
+		return;
+	}
+	AssessmentWrapper.findById(wrapperId)
+		.select('_id availableFrom availableTill')
+		.then((assessment) => {
+			Submission.findOne({
+				assessmentWrapper: assessment._id,
+				user: userId,
+			})
+				.then((submission) => {
+					res.send({
+						success: true,
+						from: assessment.availableFrom,
+						to: assessment.availableTill,
+						submittedOn: submission.createdAt,
+					});
+				})
+				.catch(() => {
+					res.send({ success: false, message: 'Error in submission' });
+				});
+		})
+		.catch(() => {
+			res.send({ success: false, message: 'Error in wrapper' });
+		});
+};
+
+const getAssessmentCores = async (req, res) => {
+	try {
+		const { role, id: userId } = req.payload;
+		let { keywords, phases, skip, limit, sort } = req.body;
+		const wrapperQuery = {};
+		const coreQuery = {};
+		if (!skip) {
+			skip = 0;
+		}
+		if (!limit) {
+			limit = 50;
+		}
+		if (!sort) {
+			sort = -1;
+		}
+		if (role === 'user' || role === 'parent') {
+			res.send({ success: false, msg: "You don't have permission" });
+			return;
+		}
+		if (keywords || trim(keywords) !== '') {
+			wrapperQuery.name = { $regex: keywords, $options: 'i' };
+			coreQuery.identifier = { $regex: keywords, $options: 'i' };
+		}
+		if (
+			(!phases || phases.length === 0) &&
+			role !== UserRole.SUPER &&
+			role !== UserRole.ADMIN
+		) {
+			phases = [];
+			logger.info('No phases section');
+			const dbUser = await UserModel.findById(userId).select('subscriptions');
+			dbUser.subscriptions.forEach((subs) => {
+				subs.subgroups.forEach((sub) => {
+					sub.phases.forEach((phase) => {
+						phases.push(phase.phase);
+					});
+				});
+			});
+			if (role === 'moderator') {
+				const client = await Client.findOne({
+					moderators: userId,
+				});
+				phases = client.phases.filter((phase) => phase);
+			}
+			wrapperQuery['phases.phase'] = { $in: phases };
+		} else {
+			wrapperQuery['phases.phase'] = { $in: phases };
+		}
+		const wrappers = await AssessmentWrapper.find(wrapperQuery)
+			.select('_id')
+			.populate({
+				path: 'core',
+				match: coreQuery,
+			});
+		const ids = [];
+		wrappers.forEach((wrapper) => {
+			ids.push(wrapper.id);
+		});
+		logger.info('Wrappers loaded');
+
+		if (ids.length === 0) {
+			res.send({ success: false, msg: 'Unexpected error' });
+			return;
+		}
+
+		const count = await AssessmentCore.find({
+			'wrappers.wrapper': { $in: ids },
+		}).countDocuments();
+
+		AssessmentCore.find({
+			'wrappers.wrapper': { $in: ids },
+		})
+			.populate([
+				{
+					path: 'wrappers.wrapper',
+					populate: 'phases.phase',
+				},
+				{
+					path: 'analysis',
+				},
+			])
+			.skip(skip)
+			.limit(limit)
+			.sort({ createdAt: -1 })
+			.then((cores) => res.send({ cores, count, success: true }));
+	} catch (err) {
+		res.send({ success: false, msg: 'Error while loading' });
+	}
+};
+
+const getUsersWhoStartedAssessment = (req, res) => {
+	const { wrapper } = req.params;
+	const { date } = req.query;
+
+	const query = { assessmentWrapperId: wrapper };
+
+	if (date) {
+		if (trim(date)) {
+			query.$and = [
+				{ createdAt: { $gte: dateToStartTime(date) } },
+				{ createdAt: { $lte: dateToEndTime(date) } },
+			];
+		}
+	}
+
+	UserLiveAssessment.find(query)
+		.populate([
+			{
+				path: 'user',
+				select: 'name email username subscriptions.subgroups.phases.phase',
+				populate: {
+					path: 'subscriptions.subgroups.phases.phase',
+					select: 'name',
+				},
+			},
+		])
+		.then((users) => {
+			res.send({ success: true, users });
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: 'Error while fetching the data', err });
+		});
+};
+
+const getWrappersScheduledToday = async (req, res) => {
+	const { id, role } = req.payload;
+	if (role !== 'moderator' && role !== 'admin' && role !== 'super') {
+		res.send({ success: false, msg: 'You are not allowed to access' });
+		return;
+	}
+
+	const query = {
+		$and: [
+			{ availableFrom: { $gte: dateToStartTime(dayjs()) } },
+			{ availableFrom: { $lte: dateToEndTime(dayjs()) } },
+		],
+	};
+
+	if (role === 'moderator') {
+		const client = await Client.findOne({ moderators: id });
+		if (client) {
+			const phases = [];
+			forEach(client.phases, (phase) => {
+				phases.push(toString(phase));
+			});
+			if (phases.length > 0) {
+				query['phases.phase'] = { $in: phases };
+			} else {
+				res.send({ success: false, msg: 'You have no access to any phase' });
+				return;
+			}
+		} else {
+			res.send({ success: false, msg: 'You have no access to any client' });
+			return;
+		}
+	}
+
+	AssessmentWrapper.find(query)
+		.then((wrappers) => {
+			res.send({ success: true, wrappers });
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: 'Error while getting wrappers', err });
+		});
+};
+
+const updateWrapperName = (req, res) => {
+	const { wrapper } = req.params;
+	const { name } = req.body;
+
+	if (!name) res.send({ success: false, msg: 'Please send updated name' });
+
+	AssessmentWrapper.updateOne({ _id: wrapper }, { $set: { name } })
+		.then((updated) => {
+			if (updated) {
+				res.send({ success: true, msg: 'Wrapper updated' });
+			} else {
+				res.send({ success: false, msg: 'Wrapper not updated' });
+			}
+		})
+		.catch(() => {
+			res.send({ success: false, msg: 'Unable to update/find wrapper' });
+		});
+};
+
 module.exports = {
 	getassessmentwrapper,
 	view,
@@ -2790,4 +3259,11 @@ module.exports = {
 	updatePrequelAndSequel,
 	updateServices,
 	markSubmissionAsNotGraded,
+	getWrapperFormat,
+	getAssementSubmissionDetails,
+	getRandomQuestion,
+	getAssessmentCores,
+	getUsersWhoStartedAssessment,
+	getWrappersScheduledToday,
+	updateWrapperName,
 };

@@ -36,9 +36,24 @@ import {
 	updatePhase,
 	fixStats,
 	sendInvitation,
+	getUserDataERP,
+	listTeachersByClients,
+	downloadUsersInCBTResponseFormat,
+	downloadUsersInCBTResponseFormatByPhase,
+	getUserByPhaseAndSubgroup,
+	getUserProfile,
+	getEmployees,
+	updateJoiningDate,
+	updateJeeData,
+	getJeeData,
+	getJeeDatabByPhases,
+	updateChildren,
+	searchToAddChildren,
+	listParentByClient,
+	// getUserData,
 } from './user.controller';
 import { getSubscribedTopics } from './user.topic.controller';
-import { getReports } from './user.assessment.controller';
+import { getReports, getReports2 } from './user.assessment.controller';
 import { getPolicyAvatarUpload, updateAvatar } from './avatar.controller';
 import auth from '../middleware/auth';
 import {
@@ -62,6 +77,7 @@ import { searchUser } from './controllers/admin/search';
 import { changeRole } from './controllers/admin/role';
 import { signInUsingClientJWT } from './controllers/clientJwtAuth';
 import userAdminRoutes from './routes/admin';
+import { addAdmission, getAdmissions } from './useradmission.controller';
 
 const router = Router(); // eslint-disable-line new-cap
 
@@ -144,9 +160,7 @@ router
 
 router.route('/clear-cache').get(auth.required, auth.isSuper, clearCache);
 
-router
-	.route('/search')
-	.post(auth.required, auth.isAtLeastMentor, withAdminPermission, searchUser);
+router.route('/search').post(auth.required, withAdminPermission, searchUser);
 router
 	.route('/download-marks')
 	.post(auth.required, auth.isModerator, downloadUserMarksData);
@@ -181,10 +195,59 @@ router.route('/subscribedTopics').get(auth.required, getSubscribedTopics);
 router.route('/send-invitation').post(auth.required, sendInvitation);
 
 router.route('/get-reports').get(auth.required, getReports);
+router.route('/get-reports2').get(auth.required, getReports2);
 router
 	.route('/update-batch')
 	.post(auth.required, auth.isModerator, withPhases, updateUserBatchBulk);
 
 router.route('/client-jwt-signin').get(signInUsingClientJWT);
+
+router.route('/erp/getData').get(auth.required, getUserDataERP);
+
+router
+	.route('/getTeachers')
+	.get(auth.required, auth.isModerator, listTeachersByClients);
+
+router
+	.route('/getParents')
+	.get(auth.required, auth.isModerator, listParentByClient);
+
+router
+	.route('/downloadUsersInCBTResponseFormat/:wrapper')
+	.get(auth.required, downloadUsersInCBTResponseFormat);
+
+router
+	.route('/downloadUsersInCBTResponseFormatByPhase/')
+	.get(auth.required, downloadUsersInCBTResponseFormatByPhase);
+
+router
+	.route('/getUsersByPhaseAndSubgroup/:phase/:subgroup')
+	.get(auth.required, getUserByPhaseAndSubgroup);
+
+router.route('/getUserProfile').get(auth.required, getUserProfile);
+
+router.route('/getEmployees').get(auth.required, getEmployees);
+
+router.route('/updateJoiningDate').post(auth.required, updateJoiningDate);
+
+router
+	.route('/jeeData')
+	.post(auth.required, updateJeeData)
+	.get(auth.required, getJeeData);
+
+router.route('/jeeData/byPhase').get(auth.required, getJeeDatabByPhases);
+
+router.route('/children/update').post(auth.required, updateChildren);
+
+router.route('/children/search').get(auth.required, searchToAddChildren);
+
+router
+	.route('/admissions')
+	.get(auth.required, getAdmissions)
+	.post(auth.required, addAdmission);
+
+// router
+// 	.route('/getCompleteData/:userId')
+// 	.get(auth.required, auth.isModerator, getUserData);
 
 export default router;

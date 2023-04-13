@@ -7,6 +7,7 @@ import { isAtLeast } from '../../utils/user/role';
 import PlaylistModel from '../models/Playlist';
 import { userHasAccessToServiceInPhase } from '../../utils/user/servicePlans';
 import PhaseMentorModel from '../../phase/PhaseMentor';
+import UserModel from '../../user/user.model';
 
 const getAllPhases = (user: IUser) => {
 	const phases: Types.ObjectId[] = [];
@@ -61,7 +62,12 @@ const playlistProjectionWhenUserHasAccess =
 Public endpoint
  */
 export async function getPlaylists(req: ExpressRequest, res: ExpressResponse) {
-	const { user, userGroups } = res.locals;
+	let { user, userGroups } = res.locals;
+	const { userId } = req.query;
+	if (user.role === 'parent') {
+		user = await UserModel.findById(userId);
+		if (!user) return res.send({ success: false, msg: 'User not found!' });
+	}
 	const { role } = user;
 	const { viewAs } = req.query;
 	const viewForPhases = parseAsString(req.query.phases);

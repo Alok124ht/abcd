@@ -55,6 +55,7 @@ interface AssessmentWrapperBase {
 	createdAt: Date;
 	updatedAt: Date;
 	tags?: TagList[];
+	onlyCBT?: boolean;
 }
 
 export interface AssessmentWrapperInterface

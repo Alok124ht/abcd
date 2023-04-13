@@ -4,7 +4,7 @@ const User = require('./user.model').default;
 const Client = require('../client/client.model').default;
 const Userxp = require('./userxp.model');
 const SuperGroupModel = require('../group/superGroup.model').default;
-const Puzzle = require('../puzzle/puzzle.model');
+const Puzzle = require('../phase/puzzle/puzzle.model');
 const MongoVar = require('../globals/Variables').default;
 const UserLiveAssessmentCache = require('../cache/UserLiveAssessment');
 const PhaseCache = require('../cache/Phase');
@@ -37,6 +37,9 @@ const userProjection = {
 	category: 1, // don't get it here
 	currentBatch: 1,
 	batchHistory: 1,
+	joiningDate: 1,
+	children: 1,
+	jeeData: 1,
 };
 
 function withPhases(user) {
@@ -255,7 +258,8 @@ function createXpDbReferralVisitor(user, referralCode, visitorId, suw) {
 
 function validateEmail(email) {
 	// eslint-disable-next-line
-	const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+	const re =
+		/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 	return re.test(String(email).toLowerCase());
 }
 
@@ -332,10 +336,20 @@ function getPreparationUser(id, supergroup, role) {
 		{ path: 'category', select: 'assessments' }, // this is heavy!!
 		{ path: 'currentBatch', select: 'name' },
 		{ path: 'batchHistory.batch', select: 'name' },
+		{
+			path: 'children',
+			select: 'name email username subscriptions.subgroups.phases.phase',
+			populate: {
+				path: 'subscriptions.subgroups.phases.phase',
+				select: 'name endDate',
+			},
+		},
 	];
+	console.log(populate);
 	return User.findById(id, projection)
 		.populate(populate)
 		.then((user_) => {
+			console.log(user_);
 			if (!user_) {
 				return new Promise((resolve) => {
 					// delete cookie also here
@@ -343,7 +357,8 @@ function getPreparationUser(id, supergroup, role) {
 				});
 			}
 			return getPreparationData(user_, supergroup, role);
-		});
+		})
+		.catch((err) => console.log(err));
 }
 
 function getAdminData(user_) {
@@ -396,6 +411,14 @@ function getMainUser(id) {
 			path: 'subscriptions.subgroups.phases.phase',
 			select:
 				'topicMocks sectionalMocks fullMocks liveTests endDate topics series users',
+		},
+		{
+			path: 'children',
+			select: 'name email username subscriptions.subgroups.phases.phase',
+			populate: {
+				path: 'subscriptions.subgroups.phases.phase',
+				select: 'name endDate',
+			},
 		},
 	];
 	return User.findById(id, projection)

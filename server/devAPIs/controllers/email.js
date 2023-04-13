@@ -8,12 +8,12 @@ const sendTestEmail = (req, res) => {
 					Html: {
 						Data: `
                             <div>
-                                <h3>Hi Amit</h3>
+                                <h3>Hi Meghal</h3>
                                 <div>
                                     As you requested, you have been enrolled for CAT Crash Course.
                                 </div>
                                 <div>
-                                    Please visit <a href="https://www.prepleaf.com/faq">FAQ<a> for more info.
+                                    Please visit <a href="https://www.prepseed.com/faq">FAQ<a> for more info.
                                 </div>
                             </div>
                         `,
@@ -27,14 +27,14 @@ const sendTestEmail = (req, res) => {
 			},
 		},
 		Destination: {
-			ToAddresses: ['asaharan812@gmail.com'],
+			ToAddresses: ['meghals0405@gmail.com'],
 		},
-		FromEmailAddress: 'Prepleaf Support<support@prepleaf.com>',
+		FromEmailAddress: 'Prepseed Helpline<help@prepseed.com>',
 	};
 	ses.sendEmail(params, (error, data) => {
 		if (error) {
 			console.error(error);
-			res.send({ type: 'Error occurred', message: error.message });
+			res.send({ type: 'Error occurred', message: error.message, error });
 		} else {
 			res.send({ data });
 		}

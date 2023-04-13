@@ -30,7 +30,7 @@ const getComments = (req: Request, res: Response, next: NextFunction) => {
 		return;
 	}
 	Comment.find({ video: videoId })
-		.populate('user', 'username dp')
+		.populate('user', 'username dp name email mobileNumber')
 		.sort({ createdAt: -1 })
 		.exec((error, comments: VideoCommentUserPopulated[]) => {
 			if (error) {

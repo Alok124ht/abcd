@@ -2,6 +2,8 @@ import { Request } from '../../types/Request';
 import { NextFunction, Response } from 'express';
 import SubjectModel from '../../models/Subject';
 import APIError from '../../helpers/APIError';
+import { Types } from 'mongoose';
+const { ObjectId } = Types;
 
 export async function listSubjects(req: Request, res: Response) {
 	const subjects = await SubjectModel.find();
@@ -13,7 +15,8 @@ export async function createSubject(
 	res: Response,
 	next: NextFunction
 ) {
-	const { name, shortName, color, isColorDark, textColor, thumbnail } = req.body;
+	const { name, shortName, color, isColorDark, textColor, thumbnail, topics } =
+		req.body;
 	const subject = new SubjectModel();
 	subject.name = name;
 	subject.shortName = shortName;
@@ -21,6 +24,7 @@ export async function createSubject(
 	subject.isColorDark = isColorDark;
 	subject.textColor = textColor;
 	subject.thumbnail = thumbnail;
+	subject.topics = topics !== undefined && topics.length !== 0 ? topics : [];
 	try {
 		await subject.save();
 		res.send(subject);
@@ -41,6 +45,7 @@ export async function updateSubject(
 		isColorDark,
 		textColor,
 		thumbnail,
+		topics,
 	} = req.body;
 	const subject = await SubjectModel.findById(_id);
 	subject.name = name;
@@ -49,6 +54,7 @@ export async function updateSubject(
 	subject.isColorDark = isColorDark;
 	subject.textColor = textColor;
 	subject.thumbnail = thumbnail;
+	subject.topics = topics !== undefined && topics.length !== 0 ? topics : [];
 	try {
 		await subject.save();
 		res.send(subject);

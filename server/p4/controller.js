@@ -103,7 +103,7 @@ const startPayment = (req, res) => {
 		req.query.callbackUrl ||
 		req.body.callbackUrl ||
 		req.get('origin') ||
-		'https://www.prepleaf.com';
+		'https://www.prepseed.com';
 	const notes = { user: order.email };
 	const prefill = {
 		contact: order.mobileNumber,
@@ -113,7 +113,7 @@ const startPayment = (req, res) => {
 		key_id: key,
 		amount: order.amount,
 		order_id: order.razorpayOrderId,
-		name: 'Prepleaf',
+		name: 'Prepseed',
 		description: 'P4 Course/Session Payment',
 		notes,
 		prefill,

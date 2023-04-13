@@ -1,11 +1,20 @@
 import express from 'express';
-import assessmentCtrl from './assessment.controller';
+import assessmentCtrl, {
+	getAssementSubmissionDetails,
+	getAssessmentCores,
+	getRandomQuestion,
+	getUsersWhoStartedAssessment,
+	getWrapperFormat,
+	getWrappersScheduledToday,
+} from './assessment.controller';
 import middlewares from './middlewares';
 import auth from '../middleware/auth';
 import groupAssessmentCtrl from './group.controller';
 import {
+	appendSubmissionsToAnalysis,
 	createSubmissionFromFlow,
 	submitAssessmentResponse,
+	uploadCbtResponse,
 } from './controllers/submission';
 import { withUserGroups } from '../user/middlewares';
 import { withPhases } from '../phase/middlewares';
@@ -16,6 +25,7 @@ import {
 	addPhase,
 	addWrapper,
 	removePhase,
+	updateOnlyCBT,
 } from './controllers/wrapperPublishing';
 import { updateTags } from './controllers/modifyWrapper';
 import { listCoresAdmin } from './controllers/admin/list';
@@ -27,7 +37,9 @@ const router = express.Router(); // eslint-disable-line new-cap
  * APIs which dont need user's (admins or user) data.
  */
 
-router.route('/getwrappers/:phase').get(assessmentCtrl.getwrappers);
+router
+	.route('/getwrappers/:phase')
+	.get(auth.required, assessmentCtrl.getwrappers);
 
 router.route('/getwrapper/:wrapperId').get(assessmentCtrl.getwrapper);
 
@@ -54,6 +66,9 @@ router
  */
 router.use('/admin', assessmentAdminRouter);
 router.route('/update').post(auth.required, assessmentCtrl.update);
+router
+	.route('/update-only-cbt')
+	.post(auth.required, auth.isModerator, updateOnlyCBT);
 router
 	.route('/update-core-config')
 	.post(auth.required, auth.isModerator, updateConfig);
@@ -124,7 +139,7 @@ router
 
 router
 	.route('/gradewrapper/:wrapperId')
-	.get(auth.required, auth.isModerator, assessmentCtrl.gradewrapper);
+	.get(auth.required, auth.isAtLeastMentor, assessmentCtrl.gradewrapper);
 
 router
 	.route('/reset-wrapper-analysis/:wrapperId')
@@ -190,6 +205,10 @@ router
 	.route('/submit')
 	.post(auth.required, middlewares.isResponseValid, submitAssessmentResponse);
 
+router
+	.route('/upload-local-response')
+	.post(auth.required, auth.isAtLeastMentor, uploadCbtResponse);
+
 router.route('/getGrades').post(auth.required, assessmentCtrl.getGrades);
 
 router.route('/getAnalysis').post(auth.required, assessmentCtrl.getAnalysis);
@@ -240,5 +259,43 @@ router
 		middlewares.isAccessAllowed,
 		startAssessment
 	);
+
+router.route('/get/format/:assessmentId').get(auth.required, getWrapperFormat);
+
+router
+	.route('/generate/questions')
+	/*
+		topic: string, required;
+		sub_topic: string[], required;
+		type: string[], optional;
+		level: number[], optional;
+		specific: [{
+			type: string, required;
+			questions: number, required
+		}], optional;
+	*/
+	.post(auth.required, getRandomQuestion);
+
+router
+	.route('/getSubmissionDetails')
+	.post(auth.required, getAssementSubmissionDetails);
+
+router.route('/get-cores').post(auth.required, getAssessmentCores);
+
+router
+	.route('/append-submissions/:submission')
+	.get(auth.required, appendSubmissionsToAnalysis);
+
+router
+	.route('/get-users-who-started-assessment/:wrapper')
+	.get(auth.required, getUsersWhoStartedAssessment);
+
+router
+	.route('/get-todays-wrappers')
+	.get(auth.required, getWrappersScheduledToday);
+
+router
+	.route('/update-wrapper-name/:wrapper')
+	.post(auth.required, assessmentCtrl.updateWrapperName);
 
 export default router;

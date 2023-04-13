@@ -9,7 +9,7 @@ const s3 = new AWS.S3({
 	secretAccessKey: process.env.GENERAL_AWS_SECRET_ACCESS_KEY,
 });
 const getFrontDeployTimestampsBySubdomains = (req, res, next) => {
-	const bucket = 'prepare.production.prepleaf.com';
+	const bucket = 'prepare.production.prepseed.com';
 	s3.listObjectsV2(
 		{
 			Bucket: bucket,

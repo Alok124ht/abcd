@@ -6,46 +6,19 @@ const { ObjectId } = Types;
 
 const PhaseSchema = new Schema(
 	{
-		name: {
-			type: String,
-			required: true,
-		},
-		enrollmentStartDate: {
-			type: Date,
-			required: false,
-		},
-		enrollmentEndDate: {
-			type: Date,
-			required: false,
-		},
-		startDate: {
-			type: Date,
-			required: true,
-		},
-		endDate: {
-			type: Date,
-			required: true,
-		},
-		group: {
-			type: String,
-		},
-		supergroup: {
-			type: ObjectId,
-			required: true,
-		},
+		name: { type: String, required: true },
+		enrollmentStartDate: { type: Date, required: false },
+		enrollmentEndDate: { type: Date, required: false },
+		startDate: { type: Date, required: true },
+		endDate: { type: Date, required: true },
+		group: { type: String },
+		supergroup: { type: ObjectId, required: true },
 		subgroups: [
 			{
-				subgroup: {
-					type: ObjectId,
-					ref: 'SubGroup',
-				},
+				subgroup: { type: ObjectId, ref: 'SubGroup' },
 			},
 		],
-		topics: [
-			{
-				type: String,
-			},
-		],
+		topics: [{ type: String }],
 		config: {
 			enableForum: Boolean,
 			enableAnnouncements: Boolean,
@@ -58,54 +31,22 @@ const PhaseSchema = new Schema(
 			required: true,
 			default: 0,
 		},
-		topicMocks: {
-			type: Boolean,
-			default: false,
-		},
-		sectionalMocks: {
-			type: Boolean,
-			default: false,
-		},
-		fullMocks: {
-			type: Boolean,
-			default: false,
-		},
-		liveTests: {
-			type: Boolean,
-			default: false,
-		},
-		series: [
-			{
-				type: String,
-			},
-		],
-		course: {
-			type: ObjectId,
-			ref: 'Course',
-		},
-		users: {
-			type: Number,
-			default: 0,
-		},
-		hidden: {
-			type: Boolean,
-			default: false,
-		},
+		topicMocks: { type: Boolean, default: false },
+		sectionalMocks: { type: Boolean, default: false },
+		fullMocks: { type: Boolean, default: false },
+		liveTests: { type: Boolean, default: false },
+		series: [{ type: String }],
+		course: { type: ObjectId, ref: 'Course' },
+		users: { type: Number, default: 0 },
+		hidden: { type: Boolean, default: false },
 		isPrivate: { type: Boolean, default: false },
 		hasCoursePlan: { type: Boolean, default: false },
 		/**
 		 * infer course plan from videos, assignments (assessments might be added later on)
 		 */
 		inferCoursePlan: { type: Boolean, default: false },
-		externalScheduleLink: {
-			type: String,
-		},
-		subjects: [
-			{
-				type: ObjectId,
-				ref: 'Subject',
-			},
-		],
+		externalScheduleLink: { type: String },
+		subjects: [{ type: ObjectId, ref: 'Subject' }],
 		deviceLimit: {
 			/**
 			 * device limit -1 or undefined (not set) will mean Infinity
@@ -117,6 +58,8 @@ const PhaseSchema = new Schema(
 				'Minimum value of Device Limit can be -1, which will mean unlimited',
 			],
 		},
+		forSchool: { type: Boolean, default: false },
+		attendanceType: { type: String, default: 'lecture' },
 	},
 	{
 		timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' },

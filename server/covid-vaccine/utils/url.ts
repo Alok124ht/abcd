@@ -28,7 +28,7 @@ function getToQueryParams(filters: VaccineFilter) {
 }
 
 export function getFilterUrl(filters: VaccineFilter) {
-	return `https://www.prepleaf.com/covid-vaccine-availability-portal/${getToQueryParams(
+	return `https://www.prepseed.com/covid-vaccine-availability-portal/${getToQueryParams(
 		filters
 	)}`;
 }

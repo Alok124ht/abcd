@@ -254,42 +254,33 @@ function calibrateStats(req, res) {
 													)
 														.count()
 														.then((hardQuestions) => {
-															const {
-																completedBy,
-																attemptHist,
-																conceptHist,
-															} = commonUserCount(
-																publishedQuestions,
-																subtopicMap[sub_topic].dataLevel,
-																subtopicMap[sub_topic].concepts
-															);
+															const { completedBy, attemptHist, conceptHist } =
+																commonUserCount(
+																	publishedQuestions,
+																	subtopicMap[sub_topic].dataLevel,
+																	subtopicMap[sub_topic].concepts
+																);
 															topics.topics[topicIdx].sub_topics[
 																subTopicIdx
 															].verified_questions = verifiedQuestions;
 															topics.topics[topicIdx].sub_topics[
 																subTopicIdx
 															].published_questions = publishedQuestions.length;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].total_questions = totalQuestions;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].difficulty.easy = easyQuestions;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].total_questions =
+																totalQuestions;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].difficulty.easy =
+																easyQuestions;
 															topics.topics[topicIdx].sub_topics[
 																subTopicIdx
 															].difficulty.medium = mediumQuestions;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].difficulty.hard = hardQuestions;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].completedBy = completedBy;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].attemptHist = attemptHist;
-															topics.topics[topicIdx].sub_topics[
-																subTopicIdx
-															].conceptHist = conceptHist;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].difficulty.hard =
+																hardQuestions;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].completedBy =
+																completedBy;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].attemptHist =
+																attemptHist;
+															topics.topics[topicIdx].sub_topics[subTopicIdx].conceptHist =
+																conceptHist;
 															topics.calibrationDate = new Date();
 
 															console.log('all good!!!', topics.calibrationDate);
@@ -648,6 +639,15 @@ function updateNote(req, res) {
 	}
 }
 
+async function getAll(req, res) {
+	const topics = await Topic.findById(
+		ObjectId('5c9a660e01d3a533d7c16aae')
+	).select(
+		'topics.name topics._id topics.sub_topics._id topics.sub_topics.name'
+	);
+	res.send(topics.topics);
+}
+
 module.exports = {
 	addConcept,
 	get,
@@ -662,4 +662,5 @@ module.exports = {
 	getDefaultNote,
 	removeConcepts,
 	updateNote,
+	getAll,
 };

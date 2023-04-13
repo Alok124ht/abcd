@@ -37,8 +37,13 @@ export async function listOrders(
 		const total = await OrderModel.countDocuments(query);
 		const orders = await OrderModel.find(query)
 			.populate('coupon', 'code')
-			.populate('user', 'name email')
+			.populate({
+				path: 'user',
+				select: 'name email subscriptions.subgroups.phases.phase',
+				populate: { path: 'subscriptions.subgroups.phases.phase', select: 'name' },
+			})
 			.populate('item')
+			.populate('merchant')
 			.limit(limit)
 			.skip(skip)
 			.sort({ _id: -1 });

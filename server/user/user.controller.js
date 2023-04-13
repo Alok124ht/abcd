@@ -18,7 +18,6 @@ const Topic = require('../topic/topic.model').default;
 const AssessmentWrapper =
 	require('../assessment/assessmentWrapper.model').default;
 const Leaderboard = require('../leaderboard/leaderboard.model');
-const Submission = require('../assessment/submission.model').default;
 const SubGroupModel = require('../group/subGroup.model').default;
 const SuperGroupModel = require('../group/superGroup.model').default;
 const VerificationToken = require('./verificationToken.model');
@@ -30,7 +29,7 @@ const Phase = require('../phase/phase.model').default;
 const { notifyUser } = require('../utils/socket');
 const emailUtils = require('../utils/mail');
 const VisitorUser = require('../models/VisitorUser');
-const { getTokenFromHeaders } = require('../utils/auth');
+const getTokenFromHeaders = require('../utils/auth').default;
 const config = require('../../config/config');
 const APIError = require('../helpers/APIError');
 const PhaseCache = require('../cache/Phase');
@@ -40,6 +39,7 @@ const roleUtils = require('../utils/user/role');
 const {
 	getDefaultSubscriptionFromPhase,
 	getDefaultUser,
+	getClientOfUser,
 } = require('./utils/user');
 
 const {
@@ -60,8 +60,34 @@ const TokenCache = require('../cache/Token');
 const UserCache = require('../cache/User');
 const ActivityAndSessionManager = require('../globals/ActivityAndSessionManager');
 const lib2 = require('../lib.js'); // all simple functions are declared here, which don't need to be changed/understood
+const { default: ClientModel } = require('../client/client.model');
+const { default: UserModel } = require('./user.model');
+const { default: Submission } = require('../assessment/submission.model');
+const {
+	toString,
+	forEach,
+	includes,
+	trim,
+	isNaN,
+	isArray,
+	toArray,
+	replace,
+	split,
+} = require('lodash');
+const { default: useraccountModel } = require('./useraccount.model');
+const { isValidObjectId } = require('mongoose');
+const { uploadAvatarInBackground } = require('./avatar.controller');
+const userxpModel = require('./userxp.model');
+const { default: logger } = require('../../config/winston');
+const {
+	default: UserVideoStat,
+} = require('../learningCenter/models/UserVideoStat');
 
 const { getTopicIndex } = lib2;
+const dayjs = require('dayjs');
+
+dayjs.extend(require('dayjs/plugin/utc'));
+dayjs.extend(require('dayjs/plugin/timezone'));
 
 function get(req, res, next) {
 	ActivityAndSessionManager.processActivity(req.payload.id);
@@ -404,7 +430,7 @@ function signout(req, res) {
 
 function addAccount(req, res) {
 	const { id } = req.payload;
-	const { supergroup, subgroup, phase } = req.body;
+	const { supergroup, subgroup, phase, portal } = req.body;
 
 	if (!supergroup) {
 		res.json({ success: false, error: { code: 'supergroup-not-found' } });
@@ -682,7 +708,7 @@ function forgotPassword(req, res, next) {
 								to: [email],
 								body: html,
 								bodyType: 'html',
-								subject: 'Prepleaf password reset request',
+								subject: 'Prepseed password reset request',
 							},
 							(error) => {
 								if (error) {
@@ -778,7 +804,7 @@ function support(req, res) {
 
 	const activePhases = getActivePhasesFromSubscriptions(user.subscriptions);
 	PhaseCache.getMany(activePhases, (error, phases) => {
-		const defaultEmails = ['amit@prepleaf.com', 'aman@prepleaf.com'];
+		const defaultEmails = ['neel@prepseed.com', 'vivek@prepseed.com'];
 		const recipientsPromise = new Promise((resolve) => {
 			Client.find({
 				phases: { $in: _.map(phases, (phase) => _.get(phase, '_id')) },
@@ -1036,6 +1062,52 @@ function list(req, res, next) {
 		.limit(limit)
 		.then((users) => res.json(users))
 		.catch((e) => next(e));
+}
+
+async function listTeachersByClients(req, res) {
+	ClientModel.findOne({
+		moderators: req.payload.id,
+	})
+		.select('phases')
+		.then((clients) => {
+			UserModel.find({
+				'subscriptions.subgroups.phases.phase': { $in: clients.phases },
+				role: 'mentor',
+			})
+				.select('name dp email username mobileNumber')
+				.then((users) => {
+					res.send(users);
+				})
+				.catch((err) => {
+					res.send({ success: false, msg: 'Error while fetching users' });
+				});
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: 'Error while fetching client information' });
+		});
+}
+
+async function listParentByClient(req, res) {
+	ClientModel.findOne({
+		moderators: req.payload.id,
+	})
+		.select('phases')
+		.then((clients) => {
+			UserModel.find({
+				'subscriptions.subgroups.phases.phase': { $in: clients.phases },
+				role: 'parent',
+			})
+				.select('name dp email username mobileNumber')
+				.then((users) => {
+					res.send(users);
+				})
+				.catch((err) => {
+					res.send({ success: false, msg: 'Error while fetching users' });
+				});
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: 'Error while fetching client information' });
+		});
 }
 
 function assignCollege(req, res) {
@@ -1495,13 +1567,13 @@ function resendVerificationToken(req, res) {
 			const smtpTransport = nodemailer.createTransport({
 				service: 'gmail',
 				auth: {
-					user: 'support@prepleaf.com',
-					pass: 'bing@prepleafX',
+					user: 'help@prepseed.com',
+					pass: '?fH_XyNx#W$3t!E=',
 				},
 			});
 			const mailOptions = {
 				to: user.email,
-				from: 'support@prepleaf.com',
+				from: 'help@prepseed.com',
 				subject: 'Account Verification Token',
 				text:
 					`${
@@ -1509,8 +1581,8 @@ function resendVerificationToken(req, res) {
 						'You are required to verify email id by clicking below link\n' +
 						`${process.env.API_BASE_HOST}${process.env.API_BASE_PATH}/users/confirmation`
 					}${token.token}.\n` +
-					'If you are unable to login, do write us at support@prepleaf.com.\n\n' +
-					'Regards\nPrepleaf',
+					'If you are unable to login, do write us at help@prepseed.com.\n\n' +
+					'Regards\nPrepseed',
 			};
 			smtpTransport.sendMail(mailOptions, () => {
 				// res.json({success: true})
@@ -2560,24 +2632,24 @@ const sendInvitation = (req, res) => {
 	User.findById(id)
 		.then((user) => {
 			if (user) {
-				let message = `Hi,\n\n${user.name} (${user.email}) has invited you to join Prepleaf.\n\n`;
+				let message = `Hi,\n\n${user.name} (${user.email}) has invited you to join Prepseed.\n\n`;
 				message +=
 					'Please click on the link below to signup and complete the invitation.\n\n';
 				message += `${referralLink}\n\n`;
 				message += 'Regards,\n';
-				message += 'Prepleaf';
+				message += 'Prepseed';
 
 				const smtpTransport = nodemailer.createTransport({
 					service: 'gmail',
 					auth: {
-						user: 'support@prepleaf.com',
-						pass: 'bing@prepleafX',
+						user: 'help@prepseed.com',
+						pass: '?fH_XyNx#W$3t!E=',
 					},
 				});
 				const mailOptions = {
 					to: email,
-					from: 'Prepleaf',
-					subject: 'Invitation to join Prepleaf',
+					from: 'Prepseed',
+					subject: 'Invitation to join Prepseed',
 					text: message,
 				};
 				smtpTransport.sendMail(mailOptions, () => {
@@ -2633,6 +2705,684 @@ function unsubscribe(req, res) {
 	}
 }
 
+const getUserDataERP = (req, res) => {
+	User.findById(req.payload.id)
+		.select('email username name _id role portal dp mobileNumber client')
+		.then((user) => {
+			res.send({ user });
+		})
+		.catch(() => {
+			res.send({ success: false, msg: 'Unable to find data' });
+		});
+};
+
+const createUserAccount = async (req, res) => {
+	// keywords could be username, email or id
+	const { keywords } = req.body;
+	// user from database as null to compare it later
+	let user = null;
+	if (!keywords) {
+		res.send({ success: false, msg: 'Params are not set' });
+		return;
+	}
+	if (isValidObjectId(keywords)) {
+		// keywords is as object id then search user by id
+		user = await UserModel.findById(keywords);
+	} else {
+		// search user by either email or username if id is not passed
+		user = UserModel.findOne({
+			$or: [
+				{ email: keywords },
+				{ emailIdentifier: keywords },
+				{ username: keywords },
+			],
+		});
+	}
+	if (user) {
+		// look for existing account
+		const account = await useraccountModel.findOne({ users: user._id });
+		if (account) {
+			// if account is there then no need to create one
+			res.send({ success: false, msg: 'User account exists' });
+		} else {
+			// if account does not exist create one
+			// eslint-disable-next-line new-cap
+			const newAccount = new useraccountModel({
+				users: [user._id],
+				hash: user.hash,
+				salt: user.salt,
+				email: user.email,
+				emailIdentifier: user.emailIdentifier,
+				defaultUser: user._id,
+			});
+			// eslint-disable-next-line no-undef
+			newAccount.save(err, (acc) => {
+				if (acc) {
+					res.send({ success: true });
+				} else {
+					res.send({ success: false, msg: 'Error while creating user account' });
+				}
+			});
+		}
+	} else {
+		// user not found by any keywords
+		res.send({ success: false, msg: 'User not found' });
+	}
+};
+
+// eslint-disable-next-line no-unused-vars
+const createUser = async ({
+	phase,
+	subgroup,
+	name,
+	email,
+	hash,
+	salt,
+	username,
+	mobileNumber,
+}) => {
+	let result = false;
+
+	await SubGroupModel.find(
+		{ 'phases.phase': ObjectId(phase), _id: ObjectId(subgroup) },
+		{ supergroup: 1 }
+	).then(async (subgroups) => {
+		// check if phase is active!! and does phase exists? isnt subgroup enough!?
+		if (subgroups.length === 1) {
+			const subscriptions = [
+				{
+					group: subgroups[0].supergroup,
+					subgroups: [
+						{
+							group: subgroups[0]._id.toString(),
+							phases: [
+								{
+									phase: ObjectId(phase),
+									active: true,
+									isAccessGranted: true,
+								},
+							],
+						},
+					],
+				},
+			];
+
+			const strippedEmail = email.replace(/(\r\n|\n|\r)/gm, '');
+			const emailIdentifier = getStrippedEmail(strippedEmail);
+
+			const finalUser = new UserModel({
+				email: strippedEmail,
+				emailIdentifier,
+				name,
+				mobileNumber,
+				milestones: [
+					{
+						achievement: 'Joined Prepseed',
+						key: '',
+						date: new Date(),
+					},
+				],
+				username,
+				settings: {
+					sharing: false,
+					goal: [{ date: new Date().toString(), goal: 1 }],
+				},
+				subscriptions,
+				isVerified: true,
+				salt,
+				hash,
+			});
+			await finalUser
+				.save()
+				.then(async (savedUser) => {
+					// eslint-disable-next-line new-cap
+					const userxp = new userxpModel({
+						user: savedUser._id,
+						xp: [
+							{
+								val: constants.xp.signup,
+								reference: savedUser._id,
+								onModel: 'User',
+								description: 'signup',
+							},
+						],
+					});
+					// eslint-disable-next-line no-param-reassign
+					savedUser.netXp = {
+						val: constants.xp.signup,
+					};
+					await userxp.save().then((savedUserXp) => {
+						// eslint-disable-next-line no-param-reassign
+						savedUser.netXp.xp = savedUserXp._id;
+						savedUser.markModified('netXp');
+
+						if (
+							process.env.NODE_ENV === 'production' ||
+							process.env.NODE_ENV === 'staging'
+						) {
+							uploadAvatarInBackground(savedUser);
+						}
+
+						result = savedUser._id;
+					});
+				})
+				.catch((err) => {
+					result = false;
+				});
+		}
+	});
+	return result;
+};
+
+// const addUserToAccount = async (req, res) => {
+// 	const { id, phase, subgroup } = req.body;
+// 	if (!id || !phase || !subgroup) {
+// 		res.send({ success: false, msg: 'Parameters are not properly set' }); // content
+// 		return;
+// 	}
+// 	const account = await useraccountModel
+// 		.findById(id)
+// 		.select('users')
+// 		.populate('users', 'name username mobileNumber -_id');
+// 	if (account) {
+// 		if (account.users.length === 0) {
+// 			res.send({
+// 				success: true,
+// 				msg: 'User account is not having any user info add it from scrath',
+// 			});
+// 		} else {
+// 			const user = account.users[0];
+// 			const created = await createUser({
+// 				phase,
+// 				subgroup,
+// 				name: user.name,
+// 				email: account.email,
+// 				mobileNumber: user.mobileNumber,
+// 				username: user.username,
+// 				salt: account.salt,
+// 				hash: account.hash,
+// 			});
+// 			if (created) {
+// 				useraccountModel
+// 					.updateOne({ _id: account._id }, { $push: { users: created } })
+// 					.then(() => {
+// 						res.send({ success: true, msg: 'Phase permission allowed' });
+// 					})
+// 					.catch(() => {
+// 						res.send({
+// 							success: false,
+// 							msg: 'User created but failed to allow permission',
+// 						});
+// 					});
+// 			} else {
+// 				res.send({ success: false, msg: 'Error while allowing permissions' });
+// 			}
+// 		}
+// 	} else {
+// 		res.send({ success: false, msg: 'User account not found' });
+// 	}
+// };
+
+const downloadUsersInCBTResponseFormat = (req, res) => {
+	const { wrapper } = req.params;
+	AssessmentWrapper.findById(wrapper)
+		.select('core phases')
+		.populate('core', 'sections')
+		.then((ass) => {
+			if (!ass) {
+				res.send({ success: false, msg: 'Wrapper not found' });
+			} else {
+				const phases = [];
+				_.forEach(ass.phases, (ph) => {
+					phases.push(ph.phase);
+				});
+				if (!phases || phases.length === 0) {
+					res.send({ success: false, msg: 'No phases found in wrapper' });
+					return;
+				}
+				User.find({
+					'subscriptions.subgroups.phases.phase': { $in: phases },
+					isArchived: { $ne: true },
+					role: 'user',
+				})
+					.select('_id name email username')
+					.then((users) => {
+						let totalQuestions = 0;
+						_.forEach(ass.core.sections, (sec) => {
+							totalQuestions += sec.questions.length;
+						});
+						let csv = 'Candidate Name,userId,Username,';
+						// eslint-disable-next-line no-plusplus
+						for (let i = 1; i <= totalQuestions; i++) {
+							csv += `Qn . ${i}`;
+							if (i !== totalQuestions) {
+								csv += ',';
+							}
+						}
+						csv += '\n';
+						_.forEach(users, (user, index) => {
+							csv += `${user.name},${_.toString(user._id)},${user.username}`;
+							if (index !== users.length - 1) {
+								csv += '\n';
+							}
+						});
+						res.send({ success: true, csv });
+					})
+					.catch(() =>
+						res.send({ success: false, msg: 'Enable to get users info' })
+					);
+			}
+		})
+		.catch(() => {
+			res.send({ success: false, msg: 'Error while processing your request' });
+		});
+};
+
+const downloadUsersInCBTResponseFormatByPhase = (req, res) => {
+	const { phase, totalQuestions } = req.query;
+	User.find({ 'subscriptions.subgroups.phases.phase': phase, role: 'user' })
+		.then((users) => {
+			if (users.length === 0) {
+				res.send({ success: false, msg: 'No users found' });
+			} else {
+				let csv = 'Candidate Name,userId,Username';
+				// eslint-disable-next-line no-plusplus
+				for (let i = 1; i <= totalQuestions; i++) {
+					csv += `Qn . ${i}`;
+					if (i !== totalQuestions) {
+						csv += ',';
+					}
+				}
+				csv += '\n';
+				_.forEach(users, (user, index) => {
+					csv += `${user.name},${_.toString(user._id)},${user.username}`;
+					if (index !== users.length - 1) {
+						csv += '\n';
+					}
+				});
+				res.send({ success: true, csv });
+			}
+		})
+		.catch(() => {
+			res.send({ success: false, msg: 'Error while generating sheet' });
+		});
+};
+
+const getUserByPhaseAndSubgroup = (req, res) => {
+	const { phase, subgroup } = req.params;
+	User.find({
+		'subscriptions.subgroups.phases.phase': phase,
+		'subscriptions.subgroups.group': subgroup,
+	})
+		.then((users) => {
+			res.send({ success: true, users });
+		})
+		.catch((err) => {
+			res.snd({ success: false });
+		});
+};
+
+const getUserProfile = async (req, res) => {
+	try {
+		const { id: payloadId, role } = req.payload;
+		const { id: userId } = req.query;
+		const phases = [];
+		if (!['admin', 'super', 'mentor', 'moderator'].includes(role)) {
+			res.send({ success: false, msg: 'You do not have access' });
+			return;
+		}
+		if (!userId) {
+			res.send({ success: false, msg: 'user id is not sent!' });
+			return;
+		}
+		logger.info(`${payloadId} is requesting to see ${userId}'s profile`);
+		const userData = await User.findById(userId)
+			.select(
+				'name email username mobileNumber subscriptions.subgroups.phases.phase oldPhases'
+			)
+			.populate([
+				{
+					path: 'subscriptions.subgroups.phases.phase',
+					select: 'name startDate endDate',
+				},
+				{
+					path: 'oldPhases',
+					select: 'name startDate endDate',
+				},
+			]);
+
+		if (!userData) {
+			res.send({ success: false, msg: 'User not found!' });
+			return;
+		}
+
+		userData.phases = [];
+		userData.currentPhases = [];
+		_.forEach(userData.subscriptions, (subs) => {
+			_.forEach(subs.subgroups, (sub) => {
+				_.forEach(sub.phases, (phs) => {
+					if (_.get(phs, 'phase', undefined)) {
+						userData.phases.push(_.get(phs, 'phase'));
+						userData.currentPhases.push(_.get(phs, 'phase'));
+						phases.push(_.get(phs, 'phase._id'));
+					}
+				});
+			});
+		});
+
+		_.forEach(userData.oldPhases, (phs) => {
+			if (_.get(phs, '_id', undefined)) {
+				phases.push(_.get(phs, '_id'));
+				userData.phases.push(phs);
+			}
+		});
+
+		userData.subscriptions = undefined;
+
+		const wrappersData = await AssessmentWrapper.find({
+			'phases.phase': { $in: phases },
+		}).select('name availableFrom availableTo');
+
+		const videoData = await UserVideoStat.find({
+			u: userId,
+			iw: true,
+			wt: { $gt: 0 },
+		})
+			.select('v wt iw progress')
+			.populate({
+				path: 'v',
+				select:
+					'tags title description embedType embedUrlId thumbnailUrls isEmbeded',
+			});
+
+		const submissionData = await Submission.find({ user: userId })
+			.select(
+				'meta.marks meta.questionsAttempted meta.correctQuestions meta.incorrectQuestions meta.correctTime meta.incorrectTime meta.unattemptedTime meta.precision meta.marksAttempted meta.marksGained meta.marksLost assessmentWrapper assessmentCore'
+			)
+			.populate([
+				{
+					path: 'assessmentWrapper',
+					select: 'name availableFrom availableTo',
+				},
+				{
+					path: 'assessmentCore',
+					select: 'duration analysis',
+					populate: {
+						path: 'analysis',
+						select:
+							'maxMarks marks.marks sumMarks sumAccuracy sumPickingAbility sumSqPickingAbility sumSqPickingAbility',
+					},
+				},
+			]);
+
+		res.send({
+			success: true,
+			user: userData,
+			videos: videoData,
+			submissions: submissionData,
+			wrappers: wrappersData,
+		});
+	} catch (err) {
+		console.log(err);
+		res.send({ success: false, msg: 'Error while fetching profile' });
+	}
+};
+
+const getEmployees = async (req, res) => {
+	const { id, role } = req.payload;
+	const { client, keywords, skip, limit, phase } = req.query;
+
+	if (!['hr', 'moderator', 'super', 'admin'].includes(role))
+		return res.send({ success: false, msg: "You don't have access here!" });
+
+	const query = {
+		role: { $in: ['mentor', 'moderator', 'employee', 'hr', 'inventory-manager'] },
+	};
+	let qlimit = 100;
+	let qskip = 0;
+	if (keywords && trim(toString(keywords))) {
+		const regex = { $regex: toString(keywords), $options: 'i' };
+		query.name = regex;
+		query.email = regex;
+		query.username = regex;
+		query.mobile = regex;
+		if (isValidObjectId(toString(keywords))) {
+			query._id = toString(keywords);
+		}
+	}
+
+	if (client) {
+		if (isValidObjectId(client)) {
+			const qClient = await Client.findById(client);
+			if (qClient) {
+				query['subscriptions.subgroups.phases.phase'] = { $in: qClient.phases };
+			}
+		} else {
+			return res.send({ success: false, msg: 'Please send valid client!' });
+		}
+	} else {
+		if (!phase) {
+			const { client: qClient } = await getClientOfUser(id);
+			if (qClient)
+				query['subscriptions.subgroups.phases.phase'] = { $in: qClient.phases };
+		}
+	}
+
+	if (phase) query['subscriptions.subgroups.phases.phase'] = phase;
+	if (skip && !isNaN(toNumber(skip))) qskip = toNumber(skip);
+	if (limit && !isNaN(toNumber(limit))) qlimit = toNumber(limit);
+
+	UserModel.find(query)
+		.select('name email username dp mobile role joiningDate')
+		.then((users) => res.send({ success: true, users }))
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while fetching users!' })
+		);
+};
+
+const updateJoiningDate = (req, res) => {
+	const { user, joiningDate } = req.body;
+	const { role } = req.payload;
+
+	if (!user || !joiningDate)
+		return res.send({ success: false, msg: 'Please send valid parameters!' });
+
+	const allowedRoles = ['moderator', 'hr', 'admin', 'super'];
+
+	if (!allowedRoles.includes(role))
+		return res.send({
+			success: false,
+			msg: 'You are not allowed to perform operation!',
+		});
+
+	console.log(
+		dayjs(joiningDate)
+			.set('hours', 0)
+			.set('minutes', 0)
+			.set('seconds', 0)
+			.set('milliseconds', 0)
+	);
+
+	User.updateOne(
+		{ _id: user },
+		{
+			$set: {
+				joiningDate:
+					typeof joiningDate === 'string'
+						? dayjs(joiningDate)
+								.set('hours', 0)
+								.set('minutes', 0)
+								.set('seconds', 0)
+								.set('milliseconds', 0)
+						: joiningDate,
+			},
+		}
+	)
+		.then((updated) => {
+			res.send({ success: true, msg: 'Updated joining date!' });
+		})
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while updating joining date!' })
+		);
+};
+
+const updateJeeData = (req, res) => {
+	const {
+		id,
+		studentName,
+		fatherName,
+		motherName,
+		instituteRollNo,
+		jeeMainsRollNo,
+		jeeMainsDOB,
+		jeeMainsMobile,
+		jeeMainsEmail,
+		jeeAdvancedRollNo,
+		jeeAdvancedMobile,
+		jeeAdvancedEmail,
+		jeeAdvancedDOB,
+		jeeMainsRegNo,
+	} = req.body;
+
+	if (!id) return res.send({ success: false, msg: 'Id is not sent!' });
+
+	User.findById(id)
+		.then((user) => {
+			if (!user) return res.send({ success: false, msg: 'User not found!' });
+			user.set('jeeData', {
+				studentName,
+				fatherName,
+				motherName,
+				instituteRollNo: instituteRollNo || user.username,
+				jeeMainsRegNo,
+				jeeMainsDOB,
+				jeeMainsRollNo,
+				jeeMainsMobile,
+				jeeMainsEmail,
+				jeeAdvancedRollNo,
+				jeeAdvancedMobile,
+				jeeAdvancedEmail,
+				jeeAdvancedDOB,
+			});
+			user.save((err) => {
+				if (err) res.send({ success: false, msg: 'Error while updating data!' });
+				else res.send({ success: true, msg: 'Successfully Updated' });
+			});
+		})
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while processing request!' })
+		);
+};
+
+const getJeeData = (req, res) => {
+	const { id } = req.query;
+	User.findById(id)
+		.select('jeeData username')
+		.then((user) => {
+			if (!user) return res.send({ success: false, msg: 'User not found!' });
+			else {
+				user.jeeData.instituteRollNo =
+					user.jeeData.instituteRollNo || user.username;
+				res.send({ success: true, jeeData: user.jeeData });
+			}
+		})
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while processing request!' })
+		);
+};
+
+const getJeeDatabByPhases = (req, res) => {
+	const { phases } = req.query;
+	if (!phases) return res.send({ success: false, msg: 'Phases not sent' });
+
+	const convertedPhases = split(replace(replace(phases, '[', ''), ']', ''), ',');
+
+	if (convertedPhases.length === 0)
+		return res.send({ success: false, msg: 'Phases not properly set' });
+
+	User.find({ 'subscriptions.subgroups.phases.phase': { $in: convertedPhases } })
+		.select('jeeData username name email mobileNumber')
+		.then((user) => {
+			if (!user || user.length === 0)
+				return res.send({ success: false, msg: 'User not found!' });
+			else {
+				res.send({ success: true, users: user });
+			}
+		})
+		.catch((err) => {
+			console.log(err);
+			res.send({ success: false, msg: 'Error while processing request!' });
+		});
+};
+
+const updateChildren = (req, res) => {
+	const { userId, children } = req.body;
+	if (!userId || !children)
+		return res.send({ success: false, msg: 'Please send proper parameters!' });
+
+	User.findById(userId)
+		.then((user) => {
+			if (!user) res.send({ succcess: false, msg: 'User not found!' });
+			else {
+				user.children = children;
+				user.save((err) => {
+					if (err) res.send({ success: false, msg: 'Error while saving user!' });
+					else res.send({ success: true, msg: 'Children Updated!' });
+				});
+			}
+		})
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while fetching User details!' })
+		);
+};
+
+const searchToAddChildren = async (req, res) => {
+	const { id, role } = req.payload;
+	const { q } = req.query;
+	const query = {
+		$or: [
+			{ username: { $regex: q, $options: 'i' } },
+			{ email: { $regex: q, $options: 'i' } },
+		],
+		role: 'user',
+	};
+	if (isValidObjectId(q)) query.$or.push({ _id: q });
+	if (role !== 'super' && role !== 'admin') {
+		if (role === 'moderator') {
+			const { client } = await getClientOfUser(id);
+			if (!client) res.send({ success: false, msg: 'Client access not found!' });
+			else query['subscriptions.subgroups.phases.phase'] = { $in: client.phases };
+		} else if (role === 'mentor') {
+			const user = await User.findById(id).select('subscriptions');
+			if (!user) res.send({ success: false, msg: 'User not found!' });
+			else {
+				const phase = get(
+					user,
+					'subscritptions[0].subgroups[0].phases[0].phase',
+					null
+				);
+				if (!phase)
+					return res.send({
+						success: false,
+						msg: "You don't have any phase access!",
+					});
+				query['subscriptions.subgroups.phases.phase'] = phase;
+			}
+		}
+	}
+	User.find(query)
+		.select('name email username subscriptions.subgroups.phases.phase')
+		.sort({ createdAt: -1 })
+		.populate({
+			path: 'subscriptions.subgroups.phases.phase',
+			select: 'name',
+		})
+		.then((users) => res.send({ success: true, users }))
+		.catch((err) =>
+			res.send({ success: false, msg: 'Error while fetching users!' })
+		);
+};
+
 module.exports = {
 	get,
 	getSubscribedTopics,
@@ -2670,4 +3420,19 @@ module.exports = {
 	sendInvitation,
 	unsubscribe,
 	logoutOfOtherDevices,
+	getUserDataERP,
+	listTeachersByClients,
+	createUserAccount,
+	downloadUsersInCBTResponseFormat,
+	downloadUsersInCBTResponseFormatByPhase,
+	getUserByPhaseAndSubgroup,
+	getUserProfile,
+	getEmployees,
+	updateJoiningDate,
+	updateJeeData,
+	getJeeData,
+	getJeeDatabByPhases,
+	updateChildren,
+	searchToAddChildren,
+	listParentByClient,
 };

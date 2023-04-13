@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const constants = require('../constants.js');
 const QuestionStatistics = require('../question/QuestionStatistics.model');
-const Puzzle = require('../puzzle/puzzle.model');
+const Puzzle = require('../phase/puzzle/puzzle.model');
 
 const ObjectId = mongoose.Schema.Types.ObjectId;
 const Mixed = mongoose.Schema.Types.Mixed;

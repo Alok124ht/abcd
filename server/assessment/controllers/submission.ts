@@ -22,12 +22,22 @@ import { IUser } from '../../user/IUser';
 import logger from '../../../config/winston';
 import { getUserAgentFromRequest } from '../../utils/request';
 import FlowLog from '../../log/flowlog.model';
-import { gradeSubmissionUpdateAssessment, gradeAllSections } from '../gradeLib';
+import {
+	gradeSubmissionUpdateAssessment,
+	gradeAllSections,
+	gradeSubmission,
+} from '../gradeLib';
 import { FlowItem, ISubmission } from '../../types/Submission';
 import { getActivePhasesFromSubscriptions } from '../../utils/phase';
 import { IQuestion } from 'server/question/IQuestion';
 import { WrapperAnalysis } from 'server/types/WrapperAnalysis';
 import { isAtLeastModerator } from '../../utils/user/role';
+import UserModel from '../../user/user.model';
+import AssessmentWrapper from '../assessmentWrapper.model';
+import { forEach, get, isArray, split, toString, toUpper } from 'lodash';
+import { ignoredRoutes } from 'express-winston';
+import WrapperAnalysisModel from '../wrapperAnalysis.model';
+import CoreAnalysis from '../coreAnalysis.model';
 
 function setQuestionTime(
 	flow: FlowItem[],
@@ -374,8 +384,15 @@ export function submitAssessmentResponse(
 	} = req.body;
 	const { response } = res.locals;
 	const { role } = req.payload;
+	logger.info('role : ' + role);
+
 	const isAdminSubmitting = isAtLeastModerator(role) && submitFor;
 	const userId = isAdminSubmitting ? submitFor : req.payload.id;
+
+	logger.info('userId : ' + role);
+
+	logger.info(req.body);
+
 	logger.info(
 		`${
 			isAdminSubmitting ? `Admin Submitting: AdminID: ${req.payload.id};` : ''
@@ -384,9 +401,14 @@ export function submitAssessmentResponse(
 		},user-agent: ${getUserAgentFromRequest(req)}, time: ${new Date()}`
 	);
 
+	let maintainedFlow = [];
+	if (isAdminSubmitting) {
+	}
+
 	AssessmentWrapperCache.get(
 		assessmentWrapperId,
 		(err1: Error, assessmentWrapper: AssessmentWrapperInterface) => {
+			console.log('here wrapper cache');
 			if (err1) {
 				next(err1);
 				return;
@@ -394,6 +416,8 @@ export function submitAssessmentResponse(
 			AssessmentCoreCache.getWithSolution(
 				assessmentWrapper.core,
 				(err2: Error, assessmentCore: AssessmentCoreInterface) => {
+					console.log('here core cache');
+
 					if (err2) {
 						next(err2);
 						return;
@@ -401,6 +425,8 @@ export function submitAssessmentResponse(
 					WrapperAnalysisCache.get(
 						assessmentWrapper.analysis,
 						(err3: Error, wrapperAnalysis: WrapperAnalysis) => {
+							console.log('here analysis cache');
+
 							if (err3) {
 								next(err3);
 								return;
@@ -408,199 +434,216 @@ export function submitAssessmentResponse(
 							CoreAnalysisCache.get(
 								assessmentCore.analysis,
 								(err4: Error, coreAnalysis: CoreAnalysisInterface) => {
+									console.log('here core analysis cache');
+
 									UserCache.getWithLiveAssessment(userId, (err: Error, user: IUser) => {
-										const flow = isAdminSubmitting
-											? flowFromRequest
-											: user.liveAssessment.flow;
-										const assessmentWrapperId = isAdminSubmitting
-											? assessmentWrapper._id
-											: user.liveAssessment.assessmentWrapperId;
-										const submission = new Submission();
-										// assumption- analysis models are already created!!
-										submission.assessmentWrapper = assessmentWrapper._id;
-										submission.assessmentCore = assessmentWrapper.core;
-										submission.wrapperAnalysis = assessmentWrapper.analysis;
-										submission.coreAnalysis = assessmentCore.analysis; // this is remaining!
-										submission.user = userId;
-										submission.response = setQuestionTime(flow, response, useFlow);
-										submission.originalResponse = response;
-										submission.flow = flow;
-										submission.version = 2;
-										submission.sEvent = sEvent;
-										if (isAdminSubmitting) {
-											submission.submittedBy = Types.ObjectId(req.payload.id);
-										}
+										try {
+											const flow = isAdminSubmitting
+												? flowFromRequest
+												: user.liveAssessment.flow;
+											const assessmentWrapperId = isAdminSubmitting
+												? assessmentWrapper._id
+												: user.liveAssessment.assessmentWrapperId;
+											const submission = new Submission();
+											// assumption- analysis models are already created!!
+											submission.assessmentWrapper = assessmentWrapper._id;
+											submission.assessmentCore = assessmentWrapper.core;
+											submission.wrapperAnalysis = assessmentWrapper.analysis;
+											submission.coreAnalysis = assessmentCore.analysis; // this is remaining!
+											submission.user = userId;
+											submission.response = setQuestionTime(flow, response, useFlow);
+											submission.originalResponse = response;
+											submission.flow = flow;
+											submission.version = 2;
+											submission.sEvent = sEvent;
+											if (isAdminSubmitting) {
+												submission.submittedBy = Types.ObjectId(req.payload.id);
+											}
 
-										// admin can re-submit
-										let hasAlreadySubmitted = isAdminSubmitting ? false : true;
-										if (
-											!isAdminSubmitting &&
-											user.liveAssessment &&
-											assessmentWrapperId
-										) {
-											hasAlreadySubmitted = false;
-											UserLiveAssessment.update(
-												{ user: userId },
-												{
-													$set: {
-														assessmentWrapperId: null,
-														startTime: null,
-														duration: 0,
-														flow: [],
-													},
-												}
-											).then(() => {
-												UserLiveAssessmentCache.set(
-													userId,
-													{
-														assessmentWrapperId: null,
-														startTime: null,
-														duration: 0,
-														flow: [],
-													},
-													() => {}
+											// admin can re-submit
+											let hasAlreadySubmitted = isAdminSubmitting ? false : true;
+
+											logger.info('is Admin Submitting : ' + isAdminSubmitting);
+
+											if (
+												!isAdminSubmitting &&
+												user.liveAssessment &&
+												assessmentWrapperId
+											) {
+												logger.info(
+													'!isAdminSubmitting && user.liveAssessment && assessmentWrapperId'
 												);
-											});
-										}
-
-										if (
-											!hasAlreadySubmitted &&
-											(assessmentWrapper.type !== 'LIVE-TEST' || assessmentWrapper.graded)
-										) {
-											// or when assessment is graded??
-											const meta = gradeSubmissionUpdateAssessment(
-												// set graded = true in submission, live or not, and meta too
-												// need to optimize this alone now!
-												assessmentWrapper,
-												assessmentCore,
-												wrapperAnalysis,
-												coreAnalysis,
-												submission,
-												getActivePhasesFromSubscriptions(user.subscriptions),
-												assessmentWrapper.type
-											);
-
-											submission.meta = meta;
-											submission.graded = true;
-											submission.live = false;
-											submission
-												.save()
-												.then((savedSubmission) => {
-													if (!isAdminSubmitting) {
-														UserLiveAssessment.update(
-															{ user: userId },
-															{
-																$set: {
-																	assessmentWrapperId: null,
-																	startTime: null,
-																	duration: 0,
-																	flow: [],
-																},
-															}
-														).then(() => {
-															UserLiveAssessmentCache.set(
-																userId,
-																{
-																	assessmentWrapperId: null,
-																	startTime: null,
-																	duration: 0,
-																	flow: [],
-																},
-																() => {}
-															);
-														});
-													}
-													WrapperAnalyst.enqueueSubmissionData(
-														{
-															meta,
-															submissionId: savedSubmission._id,
-															userId: submission.user,
+												hasAlreadySubmitted = false;
+												UserLiveAssessment.update(
+													{ user: userId },
+													{
+														$set: {
+															assessmentWrapperId: null,
+															startTime: null,
+															duration: 0,
+															flow: [],
 														},
-														wrapperAnalysis._id
-													);
-
-													const savedSubmissionWithStats = getFreshGradedStats(
-														savedSubmission,
-														assessmentCore,
-														wrapperAnalysis,
-														coreAnalysis
-													);
-													res.json({
-														success: true,
-														submission: savedSubmissionWithStats.submission,
-														submissionId: savedSubmission._id,
-														// times: [t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4],
-													});
-												})
-												.catch((saveError) => {
-													// eslint-disable-next-line no-console
-													console.log('check err', saveError);
-													res.status(422).send({
-														success: true,
-														message: 'Can not submit your response.',
-													});
-												});
-										} else if (!hasAlreadySubmitted) {
-											submission
-												.save()
-												.then((savedSubmission) => {
-													if (!isAdminSubmitting) {
-														UserLiveAssessment.update(
-															{ user: userId },
-															{
-																$set: {
-																	assessmentWrapperId: null,
-																	startTime: null,
-																	duration: 0,
-																	flow: [],
-																},
-															}
-														).then(() => {
-															UserLiveAssessmentCache.set(
-																userId,
-																{
-																	assessmentWrapperId: null,
-																	startTime: null,
-																	duration: 0,
-																	flow: [],
-																},
-																() => {}
-															);
-														});
 													}
-													const meta = gradeAllSections(
-														savedSubmission.response.sections,
-														assessmentCore.sections,
-														{},
-														assessmentCore.markingScheme,
-														assessmentCore.sectionGroups
+												).then(() => {
+													UserLiveAssessmentCache.set(
+														userId,
+														{
+															assessmentWrapperId: null,
+															startTime: null,
+															duration: 0,
+															flow: [],
+														},
+														() => {}
 													);
-													savedSubmission.meta = meta;
-
-													res.send({
-														success: true,
-														message: 'Your response have been saved successfully.',
-														submission: savedSubmission,
-														submissionId: savedSubmission._id,
-													});
-												})
-												.catch((saveError) => {
-													logger.error(
-														`Error saving submission: ${
-															typeof saveError === 'string' ? saveError : saveError.message
-														}`
-													);
-													res.status(422).send({
-														success: true,
-														message: 'Can not submit your response.',
-													});
 												});
-										} else {
-											res.status(422).send({
-												success: true,
-												user,
-												message: 'Can not submit your response. Already submitted!',
-											});
+											}
+
+											if (
+												!hasAlreadySubmitted &&
+												(assessmentWrapper.type !== 'LIVE-TEST' || assessmentWrapper.graded)
+											) {
+												// or when assessment is graded??
+												logger.info(
+													"!hasAlreadySubmitted && (assessmentWrapper.type !== 'LIVE-TEST' || assessmentWrapper.graded)"
+												);
+												const meta = gradeSubmissionUpdateAssessment(
+													// set graded = true in submission, live or not, and meta too
+													// need to optimize this alone now!
+													assessmentWrapper,
+													assessmentCore,
+													wrapperAnalysis,
+													coreAnalysis,
+													submission,
+													getActivePhasesFromSubscriptions(user.subscriptions),
+													assessmentWrapper.type
+												);
+
+												submission.meta = meta;
+												submission.graded = true;
+												submission.live = false;
+												submission
+													.save()
+													.then((savedSubmission) => {
+														if (!isAdminSubmitting) {
+															UserLiveAssessment.update(
+																{ user: userId },
+																{
+																	$set: {
+																		assessmentWrapperId: null,
+																		startTime: null,
+																		duration: 0,
+																		flow: [],
+																	},
+																}
+															).then(() => {
+																UserLiveAssessmentCache.set(
+																	userId,
+																	{
+																		assessmentWrapperId: null,
+																		startTime: null,
+																		duration: 0,
+																		flow: [],
+																	},
+																	() => {}
+																);
+															});
+														}
+														WrapperAnalyst.enqueueSubmissionData(
+															{
+																meta,
+																submissionId: savedSubmission._id,
+																userId: submission.user,
+															},
+															wrapperAnalysis._id
+														);
+
+														const savedSubmissionWithStats = getFreshGradedStats(
+															savedSubmission,
+															assessmentCore,
+															wrapperAnalysis,
+															coreAnalysis
+														);
+														res.json({
+															success: true,
+															submission: savedSubmissionWithStats.submission,
+															submissionId: savedSubmission._id,
+															// times: [t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4],
+														});
+													})
+													.catch((saveError) => {
+														// eslint-disable-next-line no-console
+														console.log('check err', saveError);
+														res.status(422).send({
+															success: true,
+															message: 'Can not submit your response.',
+														});
+													});
+											} else if (!hasAlreadySubmitted) {
+												logger.info('!isAlreadySubmitted');
+												submission
+													.save()
+													.then((savedSubmission) => {
+														if (!isAdminSubmitting) {
+															UserLiveAssessment.update(
+																{ user: userId },
+																{
+																	$set: {
+																		assessmentWrapperId: null,
+																		startTime: null,
+																		duration: 0,
+																		flow: [],
+																	},
+																}
+															).then(() => {
+																UserLiveAssessmentCache.set(
+																	userId,
+																	{
+																		assessmentWrapperId: null,
+																		startTime: null,
+																		duration: 0,
+																		flow: [],
+																	},
+																	() => {}
+																);
+															});
+														}
+														const meta = gradeAllSections(
+															savedSubmission.response.sections,
+															assessmentCore.sections,
+															{},
+															assessmentCore.markingScheme,
+															assessmentCore.sectionGroups
+														);
+														savedSubmission.meta = meta;
+
+														res.send({
+															success: true,
+															message: 'Your response have been saved successfully.',
+															submission: savedSubmission,
+															submissionId: savedSubmission._id,
+														});
+													})
+													.catch((saveError) => {
+														logger.error(
+															`Error saving submission: ${
+																typeof saveError === 'string' ? saveError : saveError.message
+															}`
+														);
+														res.status(422).send({
+															success: true,
+															message: 'Can not submit your response.',
+														});
+													});
+											} else {
+												logger.info({ payload: req.payload, body: req.body });
+												res.status(422).send({
+													success: true,
+													user,
+													message: 'Can not submit your response. Already submitted!',
+												});
+											}
+										} catch (err) {
+											console.log({ err });
 										}
 									});
 								}
@@ -694,3 +737,340 @@ export async function createSubmissionFromFlow(
 		next(e);
 	}
 }
+
+const charObject = {
+	A: 0,
+	B: 1,
+	C: 2,
+	D: 3,
+	E: 4,
+	F: 5,
+	G: 6,
+	H: 7,
+	I: 8,
+	J: 9,
+	K: 10,
+	L: 11,
+	M: 12,
+	N: 13,
+	O: 14,
+	P: 15,
+	Q: 16,
+	R: 17,
+	S: 18,
+	T: 19,
+	U: 20,
+	V: 21,
+	W: 22,
+	X: 23,
+	Y: 24,
+	Z: 25,
+};
+
+const createFlowFromRawData = (
+	flow: any[],
+	duration: number,
+	sections: any[]
+) => {
+	const newFlow: any[] = [];
+	let i = 0;
+	forEach(sections, (sec, secIndex) => {
+		forEach(sec.questions, (ques, queIndex) => {
+			let flowAnswer: string | string[] | null = null;
+
+			if (
+				[
+					'MULTIPLE_CHOICE_SINGLE_CORRECT',
+					'LINKED_MULTIPLE_CHOICE_SINGLE_CORRECT',
+					'MULTIPLE_CHOICE_MULTIPLE_CORRECT',
+					'LINKED_MULTIPLE_CHOICE_MULTIPLE_CORRECT',
+				].includes(ques.question.type)
+			) {
+				let optionsArray: any[] = [];
+				if (ques.question.options && ques.question.options.length > 0) {
+					optionsArray = ques.question.options;
+				} else if (
+					ques.question.multiOptions &&
+					ques.question.multiOptions.length > 0
+				) {
+					optionsArray = ques.question.multiOptions;
+				}
+				const splittedAnswer = split(flow[i], ',');
+				if (!splittedAnswer || splittedAnswer.length === 0) {
+					flowAnswer = null;
+				} else {
+					if (
+						[
+							'MULTIPLE_CHOICE_SINGLE_CORRECT',
+							'LINKED_MULTIPLE_CHOICE_SINGLE_CORRECT',
+						].includes(ques.question.type)
+					) {
+						if (splittedAnswer[0] && splittedAnswer[0] !== 'x') {
+							const index = get(charObject, `${toUpper(splittedAnswer[0])}`, null);
+							if (index !== null) {
+								flowAnswer = get(optionsArray[index], '_id', null);
+							}
+						}
+					} else {
+						flowAnswer = [];
+						forEach(splittedAnswer, (arr) => {
+							if (arr !== 'x') {
+								const index = get(charObject, `${toUpper(arr)}`, null);
+								if (index) {
+									// @ts-ignore
+									flowAnswer.push(get(optionsArray[index], '_id', null));
+								}
+							}
+						});
+					}
+				}
+			} else {
+				flowAnswer = flow[i] && flow[i] !== 'x' ? flow[i] : null;
+			}
+			newFlow.push({
+				section: secIndex,
+				question: queIndex,
+				response: flowAnswer,
+				time: duration * 1000,
+				state:
+					!flowAnswer || (isArray(flowAnswer) && flowAnswer.length === 0) ? 2 : 1,
+			});
+			i++;
+		});
+	});
+	return newFlow;
+};
+
+const findQuestionFromFlow = (
+	flow: any[],
+	section: number,
+	question: number
+) => {
+	let found: any = false;
+	for (var i = 0; i < flow.length; i++) {
+		if (flow[i].section === section && flow[i].question === question) {
+			found = flow[i];
+		}
+	}
+	return found;
+};
+
+const convertFlowToSections = (flow: any[], coreSections: any[]) => {
+	const sections: any[] = [];
+
+	coreSections?.forEach((sec, secIndex) => {
+		let obj: any = {
+			// @ts-ignore
+			name: sec.name,
+			total_questions: sec.questions.length,
+			questions: [],
+		};
+		sec.questions.forEach((que, questionIndex) => {
+			const found = findQuestionFromFlow(flow, secIndex, questionIndex);
+			if (!found) {
+				obj.questions.push({
+					time: 0,
+					answer: null,
+					state: 0,
+				});
+			} else {
+				obj.questions.push({
+					time: found.time,
+					answer: found.response,
+					state: found.state,
+				});
+			}
+		});
+		sections.push(obj);
+	});
+	return sections;
+};
+
+export const uploadCbtResponse = async (
+	req: ExpressRequest,
+	res: ExpressResponse
+) => {
+	try {
+		const { id } = req.payload;
+		const { flow, submitFor, wrapper } = req.body;
+
+		logger.info('api called');
+
+		const dbUser = await UserModel.findById(submitFor);
+
+		const userPhases = getActivePhasesFromSubscriptions(dbUser.subscriptions);
+
+		const dbWrapper = await AssessmentWrapper.findById(wrapper).populate([
+			{
+				path: 'analysis',
+			},
+			{
+				path: 'core',
+				populate: [
+					{ path: 'analysis' },
+					{ path: 'sections.questions.question', model: 'Question' },
+				],
+			},
+		]);
+
+		if (!dbWrapper) {
+			res.send({ success: false, msg: 'Wrapper not found' });
+			return;
+		}
+
+		let totalQues = 0;
+		forEach(dbWrapper.core.sections, (sec) => {
+			forEach(sec.questions, (ques) => {
+				totalQues += 1;
+			});
+		});
+
+		if (totalQues === 0) {
+			totalQues = 50;
+		}
+
+		const convertedFlow = createFlowFromRawData(
+			flow,
+			dbWrapper.core.duration / totalQues,
+			dbWrapper.core.sections
+		);
+
+		const sections = convertFlowToSections(
+			convertedFlow,
+			dbWrapper.core.sections
+		);
+
+		const newSubmission = new Submission();
+		newSubmission.user = submitFor;
+		newSubmission.assessmentWrapper = wrapper;
+		// @ts-ignore
+		newSubmission.assessmentCore = dbWrapper.core._id;
+		// @ts-ignore
+		newSubmission.wrapperAnalysis = dbWrapper.analysis._id;
+		// @ts-ignore
+		newSubmission.coreAnalysis = dbWrapper.core.analysis._id;
+		newSubmission.response = { sections };
+		newSubmission.originalResponse = { sections };
+		newSubmission.graded = dbWrapper.graded;
+		newSubmission.live = true;
+		newSubmission.version = 2;
+		newSubmission.isCategorized = true;
+		newSubmission.attemptsUpdated = false;
+		newSubmission.ignore = false;
+		newSubmission.submittedBy = id;
+		newSubmission.flow = convertedFlow;
+		newSubmission.sEvent = 'user';
+
+		if (dbWrapper.graded) {
+			// @ts-ignore
+			newSubmission.meta = gradeSubmission(
+				newSubmission,
+				dbWrapper.core,
+				// @ts-ignore
+				dbWrapper.analysis.bonus,
+				0,
+				userPhases,
+				dbWrapper.phases,
+				dbWrapper.type
+			);
+		}
+
+		newSubmission.save((err, saved) => {
+			if (saved) {
+				WrapperAnalyst.enqueueSubmissionData(
+					{
+						meta: newSubmission.meta,
+						submissionId: saved._id,
+						userId: newSubmission.user,
+					},
+					// @ts-ignore
+					dbWrapper.analysis._id
+				);
+				res.send({
+					success: true,
+					msg: 'Assessment uploaded',
+				});
+			} else {
+				res.send({
+					success: false,
+					msg: 'Failed to upload',
+				});
+			}
+		});
+	} catch (err) {
+		res.send({
+			success: false,
+			msg: 'Parsing error',
+			err: err.message,
+		});
+	}
+};
+
+export const appendSubmissionsToAnalysis = async (
+	req: ExpressRequest,
+	res: ExpressResponse
+) => {
+	const { submission } = req.params;
+	const dbSubmission = await Submission.findById(submission);
+
+	if (dbSubmission) {
+		const wrapperAnalysis = await WrapperAnalysisModel.findById(
+			dbSubmission.wrapperAnalysis
+		);
+		const coreAnalysis = await CoreAnalysis.findById(dbSubmission.coreAnalysis);
+
+		let successes = {
+			wrapperAnalysis: false,
+			coreAnalysis: false,
+		};
+		if (wrapperAnalysis) {
+			let found = false;
+			forEach(wrapperAnalysis.submissions, (submissions) => {
+				if (toString(submissions.submission) === submission) {
+					found = true;
+				}
+			});
+			if (!found) {
+				await WrapperAnalysisModel.updateOne(
+					{ _id: dbSubmission.wrapperAnalysis },
+					{ $push: { submissions: { submission: Types.ObjectId(submission) } } }
+				).then((updated) => {
+					if (updated) {
+						successes.wrapperAnalysis = true;
+					}
+				});
+			}
+		}
+		if (coreAnalysis) {
+			let found = false;
+			forEach(coreAnalysis.submissions, (submissions) => {
+				if (toString(submissions.submission) === submission) {
+					found = true;
+				}
+			});
+			if (!found) {
+				await CoreAnalysis.updateOne(
+					{ _id: dbSubmission.coreAnalysis },
+					{ $push: { submissions: { submission: Types.ObjectId(submission) } } }
+				).then((updated) => {
+					if (updated) {
+						successes.coreAnalysis = true;
+					}
+				});
+			}
+		}
+
+		let msg = 'Done Submitting';
+
+		if (successes.coreAnalysis) {
+			msg += ', Added to core Analysis';
+		}
+		if (successes.wrapperAnalysis) {
+			msg += ', Added to wrapper Analysis';
+		}
+
+		res.send({ success: true, msg });
+	} else {
+		res.send({ success: false, msg: 'Submission not found' });
+	}
+};

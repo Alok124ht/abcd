@@ -1,5 +1,5 @@
-const AssessmentWrapper = require('../assessment/assessmentWrapper.model')
-	.default;
+const AssessmentWrapper =
+	require('../assessment/assessmentWrapper.model').default;
 const cacheManager = require('./cache-manager');
 
 const memoryCache = cacheManager({
@@ -18,6 +18,7 @@ const projection = {
 	prequel: 1,
 	availableFrom: 1,
 	showInReports: 1,
+	hideResults: 1,
 };
 
 const prefix = 'at-';
@@ -29,6 +30,7 @@ function getAssessmentWrapper(id, cacheCallback) {
 			{ path: 'prequel', select: 'analysis type phases.phase phases.name name' },
 		])
 		.then((assessmentWrapper) => {
+			console.log(assessmentWrapper);
 			if (assessmentWrapper) {
 				cacheCallback(null, assessmentWrapper.toObject());
 			} else {
@@ -47,11 +49,11 @@ function getManyAssessmentWrapper(ids, cacheCallback) {
 			{ path: 'prequel', select: 'analysis type phases.phase phases.name name' },
 		])
 		.then((assessmentWrappers) => {
+			console.log(assessmentWrappers);
 			const assessmentWrappersById = {};
 			assessmentWrappers.forEach((assessmentWrapper) => {
-				assessmentWrappersById[
-					assessmentWrapper._id
-				] = assessmentWrapper.toObject();
+				assessmentWrappersById[assessmentWrapper._id] =
+					assessmentWrapper.toObject();
 			});
 			cacheCallback(
 				null,

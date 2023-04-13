@@ -112,7 +112,7 @@ function comment(req, res, next) {
 					.then(() => {
 						const email = new Email({
 							subject: 'Comment',
-							data: `https://admin.prepleaf.com/questions/?id=${aid}`,
+							data: `https://admin.prepseed.com/questions/?id=${aid}`,
 						});
 						email.save();
 						discussion.threads[discussion.threads.length - 1].user = {
@@ -139,7 +139,7 @@ function comment(req, res, next) {
 					.then(() => {
 						const email = new Email({
 							subject: 'Comment',
-							data: `https://admin.prepleaf.com/questions/?id=${aid}`,
+							data: `https://admin.prepseed.com/questions/?id=${aid}`,
 						});
 						email.save();
 						const clone = cloneDiscussion(newDiscussion);
@@ -313,7 +313,7 @@ function reply(req, res, next) {
 				.then(() => {
 					const email = new Email({
 						subject: 'Reply',
-						data: `https://admin.prepleaf.com/questions/?id=${discussion.id}`,
+						data: `https://admin.prepseed.com/questions/?id=${discussion.id}`,
 					});
 					email.save();
 					if (found !== -1) {

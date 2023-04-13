@@ -13,7 +13,6 @@ const get = (req, res) => {
 		},
 		(error, data) => {
 			if (error) {
-				console.error(error);
 				res.status(500).send({ success: false });
 			} else {
 				res.send({ data, success: true });
@@ -34,7 +33,6 @@ const query = (req, res) => {
 	};
 	dynamo.query(params, (error, data) => {
 		if (error) {
-			console.error(error);
 			res.status(500).send({ success: false });
 		} else {
 			res.send({ data, success: true });

@@ -1,6 +1,10 @@
 import { model, Types } from 'mongoose';
 import { getStrippedEmail } from '../../utils/user/email';
 import { IUserModel, UserSubscription } from '../IUser';
+import UserModel from '../user.model';
+import ClientModel from '../../client/client.model';
+import { get } from 'lodash';
+import { Client } from '../../types/Client';
 
 export function getDefaultUser(
 	email: string,
@@ -18,7 +22,7 @@ export function getDefaultUser(
 		mobileNumber: '',
 		milestones: [
 			{
-				achievement: 'Joined Prepleaf',
+				achievement: 'Joined Prepseed',
 				key: '',
 				date: new Date(),
 			},
@@ -77,3 +81,20 @@ export async function getDefaultSubscriptionFromPhase(
 	}
 	return { error: 'unknown', subscriptions: null };
 }
+
+export const getClientOfUser: (
+	userId: string
+) => Promise<{ error: boolean; client?: Client }> = async (userId: string) => {
+	try {
+		const user = await UserModel.findById(userId).select('_id subscriptions');
+		const client = await ClientModel.findOne({
+			phases: get(user, 'subscriptions[0].subgroups[0].phases[0].phase', 'abcd'),
+		});
+		if (!client) {
+			return { error: true, client };
+		}
+		return { error: false, client };
+	} catch (err) {
+		return { error: true };
+	}
+};

@@ -2,7 +2,13 @@ import { UserRole } from '../../user/IUser';
 
 const roleOrder = [
 	UserRole.USER,
+	UserRole.PARENT,
 	UserRole.MENTOR,
+	UserRole.LIBRARIAN,
+	UserRole.EMPLOYEE,
+	UserRole.HR,
+	UserRole.INVENTORY_MANAGER,
+	UserRole.ACCOUNT_STAFF,
 	UserRole.MODERATOR,
 	UserRole.ADMIN,
 	UserRole.SUPER,
@@ -46,7 +52,7 @@ export function isEqualOrBelow(maxRole: UserRole, role: UserRole | string) {
 }
 
 export const isAtLeastMentor = (role: UserRole | string) =>
-	isAtLeast(UserRole.MENTOR, role);
+	isAtLeast(UserRole.MENTOR, role) || role === 'super';
 
 export const isAtLeastModerator = (role: UserRole | string) =>
-	isAtLeast(UserRole.MODERATOR, role);
+	isAtLeast(UserRole.MODERATOR, role) || role === 'super';

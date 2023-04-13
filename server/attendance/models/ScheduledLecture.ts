@@ -7,16 +7,8 @@ import {
 const ScheduledLectureSchema = new Schema(
 	{
 		label: String,
-		lecturer: {
-			type: Schema.Types.ObjectId,
-			ref: 'User',
-			index: true,
-		},
-		subject: {
-			type: Schema.Types.ObjectId,
-			ref: 'Subject',
-			index: true,
-		},
+		lecturer: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+		subject: { type: Schema.Types.ObjectId, ref: 'Subject', index: true },
 		phases: {
 			type: [{ type: Schema.Types.ObjectId, ref: 'Phase' }],
 			index: true,

@@ -26,13 +26,9 @@ const bonusFactors = [
 
 const UserSchema = new mongoose.Schema(
 	{
-		username: {
-			type: String,
-			// unique: true,
-		},
-		name: {
-			type: String,
-		},
+		identifyNo: { type: String },
+		username: { type: String },
+		name: { type: String },
 		mobileNumber: {
 			type: String,
 			match: [
@@ -40,45 +36,16 @@ const UserSchema = new mongoose.Schema(
 				'The value of path {PATH} ({VALUE}) is not a valid mobile number.',
 			],
 		},
-		email: {
-			type: String,
-			required: true,
-			// unique: true,
-		},
-		emailIdentifier: {
-			type: String,
-			// unique: true,
-		},
+		email: { type: String, required: true },
+		emailIdentifier: { type: String },
 		hash: String,
-		isVerified: {
-			type: Boolean,
-			default: false,
-		},
-		verifiedBy: {
-			type: String,
-			enum: ['Self', 'Admin'],
-			default: 'Self',
-		},
-		role: {
-			type: String,
-			default: 'user',
-		},
-		phases: [
-			{
-				type: ObjectId,
-				ref: 'Phase',
-			},
-		],
-		type: {
-			// type is user type i.e. employer
-			type: String,
-		},
+		isVerified: { type: Boolean, default: false },
+		verifiedBy: { type: String, enum: ['Self', 'Admin'], default: 'Self' },
+		role: { type: String, default: 'user' },
+		phases: [{ type: ObjectId, ref: 'Phase' }],
+		type: { type: String },
 		salt: String,
-		bookmarks: {
-			// not used
-			type: Array,
-			default: [],
-		},
+		bookmarks: { type: Array, default: [] },
 		stats: {
 			topics: [
 				{
@@ -104,20 +71,11 @@ const UserSchema = new mongoose.Schema(
 								// session: String
 								default: { qid: '', startTime: '' },
 							},
-							test_performance: {
-								type: Object,
-								default: {},
-							},
-							questions: {
-								type: Array,
-								default: [],
-							},
+							test_performance: { type: Object, default: {} },
+							questions: { type: Array, default: [] },
 							concepts: [
 								{
-									id: {
-										type: ObjectId,
-										ref: 'Concept',
-									},
+									id: { type: ObjectId, ref: 'Concept' },
 									total: Number,
 									correct: Number,
 								},
@@ -139,57 +97,24 @@ const UserSchema = new mongoose.Schema(
 					time_utilization_score: Number,
 				},
 			],
-			daily_activity: {
-				type: Array,
-				default: [],
-			},
+			daily_activity: { type: Array, default: [] },
 			last_activity: Object,
 			difficulty: {
-				Easy: {
-					type: Number,
-					default: 0,
-				},
-				Medium: {
-					type: Number,
-					default: 0,
-				},
-				Hard: {
-					type: Number,
-					default: 0,
-				},
+				Easy: { type: Number, default: 0 },
+				Medium: { type: Number, default: 0 },
+				Hard: { type: Number, default: 0 },
 			},
 			calibrationDate: Date,
 		},
 		session: {
 			// include notes in session
-			live: {
-				// add last inactive time!!!!! very important
-				type: String,
-				default: '', // '' means session is not running
-			},
-			sessions: [
-				{
-					session: {
-						type: ObjectId,
-						ref: 'Session',
-					},
-				},
-			],
+			live: { type: String, default: '' },
+			sessions: [{ session: { type: ObjectId, ref: 'Session' } }],
 		},
 		liveAssessment: {
-			id: {
-				type: String,
-				default: '', // '' means session is not running
-			},
-			startTime: {
-				type: Date,
-				default: null,
-			},
-			duration: {
-				// if time exceeds more than duration, auto submit submission!!
-				type: Number,
-				default: 0,
-			},
+			id: { type: String, default: '' },
+			startTime: { type: Date, default: null },
+			duration: { type: Number, default: 0 },
 			flow: [
 				{
 					id: Number,
@@ -205,18 +130,9 @@ const UserSchema = new mongoose.Schema(
 		},
 		streak: {
 			date: String,
-			day: {
-				type: Number,
-				default: 0,
-			},
-			todays_count: {
-				type: Number,
-				default: 0,
-			},
-			todays_correct: {
-				type: Number,
-				default: 0,
-			},
+			day: { type: Number, default: 0 },
+			todays_count: { type: Number, default: 0 },
+			todays_correct: { type: Number, default: 0 },
 		},
 		xp: {
 			// not used any more
@@ -226,83 +142,35 @@ const UserSchema = new mongoose.Schema(
 				todays_count: Number,
 				todays_correct: Number,
 			},
-			practice: {
-				type: Number,
-				default: 0,
-			},
-			signup: {
-				type: Number,
-				default: constants.xp.signup,
-			},
-			referral: {
-				type: Number,
-				default: 0,
-			},
-			assessment: [
-				{
-					xp: Number,
-					id: String,
-					date: Date,
-				},
-			],
-			used: [
-				{
-					xp: Number,
-					code: String,
-					date: Date,
-				},
-			],
+			practice: { type: Number, default: 0 },
+			signup: { type: Number, default: constants.xp.signup },
+			referral: { type: Number, default: 0 },
+			assessment: [{ xp: Number, id: String, date: Date }],
+			used: [{ xp: Number, code: String, date: Date }],
 		},
 		netXp: {
-			xp: {
-				type: ObjectId,
-				ref: 'Userxp',
-			},
-			val: {
-				type: Number,
-				default: 0,
-			},
+			xp: { type: ObjectId, ref: 'Userxp' },
+			val: { type: Number, default: 0 },
 		},
 		milestones: [
 			{
 				achievement: String,
 				key: String,
-				date: {
-					type: Date,
-					default: Date.now,
-				},
+				date: { type: Date, default: Date.now },
 			},
 		],
 		settings: {
 			sharing: { type: Boolean, default: false },
 			goal: { type: Array, default: [] },
 			goalUpdateRequest: {
-				goal: {
-					type: Number,
-					default: 0,
-				},
-				date: {
-					type: Date,
-					default: Date.now,
-				},
-				active: {
-					type: Boolean,
-					default: false,
-				},
+				goal: { type: Number, default: 0 },
+				date: { type: Date, default: Date.now },
+				active: { type: Boolean, default: false },
 			},
 		},
-		createdAt: {
-			type: Date,
-			default: Date.now,
-		},
-		dp: {
-			type: String,
-			default: '',
-		},
-		thumbnail: {
-			type: String,
-			default: '',
-		},
+		createdAt: { type: Date, default: Date.now },
+		dp: { type: String, default: '' },
+		thumbnail: { type: String, default: '' },
 		resetPasswordToken: String,
 		resetPasswordExpires: Date,
 		subscriptions: [
@@ -333,11 +201,7 @@ const UserSchema = new mongoose.Schema(
 						participants: Number,
 					},
 				],
-				k: {
-					// multiplier
-					type: Number,
-					default: constants.kRating0,
-				},
+				k: { type: Number, default: constants.kRating0 },
 				subgroups: [
 					{
 						group: String,
@@ -357,14 +221,8 @@ const UserSchema = new mongoose.Schema(
 						},
 						phases: [
 							{
-								phase: {
-									type: ObjectId,
-									ref: 'Phase',
-								},
-								active: {
-									type: Boolean,
-									default: true,
-								},
+								phase: { type: ObjectId, ref: 'Phase' },
+								active: { type: Boolean, default: true },
 								isAccessGranted: { type: Boolean, default: true },
 								revocationReason: { type: Mixed },
 							},
@@ -373,35 +231,15 @@ const UserSchema = new mongoose.Schema(
 				],
 			},
 		],
-		demoStep: {
-			type: Number,
-			required: true,
-			default: 0,
-		},
-		category: {
-			type: ObjectId,
-			ref: 'Usercategory',
-		},
-		version: {
-			type: Number,
-			default: 1,
-		},
+		demoStep: { type: Number, required: true, default: 0 },
+		category: { type: ObjectId, ref: 'Usercategory' },
+		version: { type: Number, default: 1 },
 		isArchived: Boolean,
-		archiveRequest: {
-			type: Date,
-		},
+		archiveRequest: { type: Date },
 		label: { type: String, default: '' },
-		labelUpdate: {
-			type: Date,
-		},
-		client: {
-			type: ObjectId,
-			ref: 'Client',
-		},
-		currentBatch: {
-			type: ObjectId,
-			ref: 'Batch',
-		},
+		labelUpdate: { type: Date },
+		client: { type: ObjectId, ref: 'Client' },
+		currentBatch: { type: ObjectId, ref: 'Batch' },
 		batchHistory: [
 			{
 				batch: { type: ObjectId, ref: 'Batch' },
@@ -412,6 +250,26 @@ const UserSchema = new mongoose.Schema(
 			},
 		],
 		subjects: [{ type: ObjectId, ref: 'Subject' }],
+		oldPhases: [{ type: ObjectId, ref: 'Phase' }],
+		portal: { type: String, default: 'lms' },
+		joiningDate: Date,
+		children: [{ type: ObjectId, ref: 'User' }],
+		jeeData: {
+			studentName: String,
+			fatherName: String,
+			motherName: String,
+			instituteRollNo: String,
+			jeeMainsRegNo: String,
+			jeeMainsDOB: String,
+			jeeMainsRollNo: String,
+			jeeMainsMobile: String,
+			jeeMainsEmail: String,
+			jeeAdvancedRollNo: String,
+			jeeAdvancedMobile: String,
+			jeeAdvancedEmail: String,
+			jeeAdvancedDOB: String,
+		},
+		studentCompleteDetails: { type: ObjectId, ref: 'UserCompleteDetails' },
 	},
 	{ usePushEach: true }
 );

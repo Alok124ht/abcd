@@ -269,6 +269,40 @@ function archive(req, res) {
 	}
 }
 
+function unarchive(req, res) {
+	const {
+		payload: { role, id: _id },
+	} = req;
+	if (role !== 'admin' && role !== 'super' && role !== 'moderator') {
+		res.json({ success: false });
+		return;
+	}
+
+	const { id } = req.body;
+	if (role === 'moderator') {
+		Client.findOne({ moderators: ObjectId(_id) }).then((client) => {
+			if (client) {
+				Draft.update(
+					{ _id: id, client: client._id },
+					{ $set: { isArchived: false } }
+				).then((m) => {
+					if (m.nModified) {
+						res.json({ success: true });
+					} else {
+						res.json({ success: false });
+					}
+				});
+			} else {
+				res.json({ success: false });
+			}
+		});
+	} else {
+		Draft.update({ _id: id }, { $set: { isArchived: false } }).then(() => {
+			res.json({ success: true });
+		});
+	}
+}
+
 function generateSyllabus(draft) {
 	const syllabus = {}; // sort syllabus alphabatically!!!
 	draft.sections.forEach((section) => {
@@ -549,4 +583,13 @@ function getDraft(req, res) {
 		});
 }
 
-module.exports = { clone, list, save, getDraft, update, publish, archive };
+module.exports = {
+	clone,
+	list,
+	save,
+	getDraft,
+	update,
+	publish,
+	archive,
+	unarchive,
+};

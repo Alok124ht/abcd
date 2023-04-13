@@ -86,9 +86,8 @@ const createEmbed = async (req, res, next) => {
 	let embedType = embedTypeUserProvided;
 	if (includes(embedUrl, '://')) {
 		try {
-			const { embedUrlId: parsedEmbedUrlId, provider: parsedProvider } = parseUrl(
-				embedUrl
-			);
+			const { embedUrlId: parsedEmbedUrlId, provider: parsedProvider } =
+				parseUrl(embedUrl);
 			embedUrlId = parsedEmbedUrlId;
 			embedType = parsedProvider;
 		} catch (e) {

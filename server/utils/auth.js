@@ -1,17 +1,20 @@
+import { default as tokenModel } from '../token/token.model';
+
 const getTokenFromHeaders = (req) => {
 	const {
 		headers: { authorization },
 		cookies,
 	} = req;
+	let token = null;
 	if (cookies.auth) {
-		return cookies.auth;
+		token = cookies.auth;
 	}
 	if (
 		authorization &&
 		(authorization.split(' ')[0] === 'Token' ||
 			authorization.split(' ')[0] === 'Bearer')
 	) {
-		return authorization.split(' ')[1];
+		token = authorization.split(' ')[1];
 	}
 	const { authorization: postAuthorization } = req.body;
 	if (
@@ -19,9 +22,24 @@ const getTokenFromHeaders = (req) => {
 		(postAuthorization.split(' ')[0] === 'Token' ||
 			postAuthorization.split(' ')[0] === 'Bearer')
 	) {
-		return postAuthorization.split(' ')[1];
+		token = postAuthorization.split(' ')[1];
 	}
-	return null;
+	if (token !== null) {
+		tokenModel
+			.updateOne(
+				{
+					token,
+				},
+				{
+					$set: {
+						updatedAt: Date.now(),
+					},
+				}
+			)
+			.then(() => {})
+			.catch(() => {});
+	}
+	return token;
 };
 
-module.exports = { getTokenFromHeaders };
+export default getTokenFromHeaders;

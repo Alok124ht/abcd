@@ -1,4 +1,10 @@
 import { Document, Model, Types } from 'mongoose';
+
+interface AvailableLeaves {
+	casual: number;
+	medical: number;
+}
+
 interface ClientBase {
 	name: string;
 	phases: Types.ObjectId[];
@@ -16,6 +22,9 @@ interface ClientBase {
 	accessToken?: string;
 	createdAt: Date;
 	updatedAt: Date;
+	portal: string;
+	availableLeaves: AvailableLeaves;
+	clientType: string;
 }
 
 export interface Client extends ClientBase, Document {}

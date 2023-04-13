@@ -38,6 +38,22 @@ const ClientSchema = new Schema(
 			portals: [String],
 			websites: [String],
 		},
+		portal: {
+			type: String,
+			default: 'lms',
+		},
+		clientType: {
+			type: String,
+			default: 'coaching',
+		},
+		availableLeaves: {
+			casual: Number,
+			medical: Number,
+		},
+		archive: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	{ timestamps: true }
 );

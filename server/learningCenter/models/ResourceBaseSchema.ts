@@ -27,6 +27,10 @@ const ResourceBaseSchema = {
 			value: String,
 		},
 	],
+	isArchived: {
+		type: Boolean,
+		default: false,
+	},
 };
 
 export interface ResourceBase {
@@ -35,6 +39,7 @@ export interface ResourceBase {
 	thumbNailsUrls: string[];
 	createdBy: Types.ObjectId;
 	tags: TagList;
+	isArchived: Boolean;
 }
 
 export interface ResourceBaseDocument extends Document, ResourceBase {

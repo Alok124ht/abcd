@@ -34,12 +34,11 @@ export async function createAnnouncement(
 	const { adminPermission, phases: allPhases } = res.locals;
 	const { id } = req.payload;
 
-	if (!phaseIds || !phaseIds.length) {
-		res.status(422).send({
-			message: 'Please select at least one Phase',
-		});
-		return;
-	}
+	if (!phaseIds || !phaseIds.length)
+		return res.status(422).send({ message: 'Please select at least one Phase' });
+
+	if (!title || !body)
+		return res.status(422).send({ message: 'Please send proper parameters!' });
 
 	if (
 		!phaseIds.every(
@@ -81,6 +80,28 @@ export async function createAnnouncement(
 		next(new APIError('Unknown error. Caught in final.'));
 	}
 }
+
+export const archive = (req: Request, res: Response) => {
+	const { id: _id, archive, restore } = req.query;
+
+	if (!_id || (!archive && !restore))
+		return res.send({ success: false, msg: 'Please send proper parameters!' });
+
+	const operation = archive ? 'delete' : 'restore';
+	Announcement.findById({ _id })
+		.then(async (announcement) => {
+			if (!announcement)
+				return res.send({ success: false, msg: 'Annoncement not found!' });
+			announcement.set('isArchived', archive ? true : false);
+			announcement.save((err, saved) => {
+				if (saved) res.send({ success: true, msg: `Successfully ${operation}d!` });
+				else res.send({ success: false, msg: `Fail to ${operation}` });
+			});
+		})
+		.catch((err) => {
+			res.send({ success: false, msg: `Error on ${operation}!` });
+		});
+};
 
 export async function updateAnnouncement(
 	req: Request,
@@ -167,9 +188,12 @@ export async function listAnnouncements(
 			? searchedPhases.map((phaseId: any) => Types.ObjectId(phaseId))
 			: undefined
 	);
+	const finalQuery: any = { ...filterQuery };
+	if (!['admin', 'super'].includes(role)) finalQuery.isArchived = { $ne: true };
+
 	try {
-		const total = await Announcement.countDocuments(filterQuery);
-		const announcements = await Announcement.find(filterQuery)
+		const total = await Announcement.countDocuments(finalQuery);
+		const announcements = await Announcement.find(finalQuery)
 			.limit(limit)
 			.skip(skip)
 			.sort({ _id: -1 })
@@ -188,13 +212,8 @@ const createFilterQuery = (
 ): FilterQuery<AnnouncementDocument> => {
 	if (isAtLeast(UserRole.SUPER, userRole)) {
 		const filter: FilterQuery<AnnouncementDocument> = {};
-		if (searchedPhases && searchedPhases.length) {
-			filter.visibleTo = {
-				$elemMatch: {
-					value: { $in: searchedPhases },
-				},
-			};
-		}
+		if (searchedPhases && searchedPhases.length)
+			filter.visibleTo = { $elemMatch: { value: { $in: searchedPhases } } };
 		return filter;
 	}
 	let allPhases = adminPermission.phases;
@@ -206,11 +225,7 @@ const createFilterQuery = (
 			? allPhases.filter((phase) => searchedPhases.some((p) => p.equals(phase)))
 			: allPhases;
 	const filter: FilterQuery<AnnouncementDocument> = {
-		visibleTo: {
-			$elemMatch: {
-				value: { $in: filteredPhases },
-			},
-		},
+		visibleTo: { $elemMatch: { value: { $in: filteredPhases } } },
 	};
 	return filter;
 };

@@ -1,6 +1,6 @@
 import { Document, Schema, model, Model } from 'mongoose';
 
-interface SubjectDocument extends Document {
+export interface SubjectDocument extends Document {
 	name: string;
 	shortName: string;
 	/**
@@ -16,6 +16,7 @@ interface SubjectDocument extends Document {
 	 * thumbnail to be used over subject color
 	 */
 	thumbnail: string;
+	topics?: string[];
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -49,6 +50,7 @@ const SubjectSchema = new Schema(
 		thumbnail: {
 			type: String,
 		},
+		topics: [{ type: String }],
 	},
 	{
 		timestamps: true,

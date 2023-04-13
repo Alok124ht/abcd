@@ -170,3 +170,18 @@ export function selectQuestions(questions, count, subTopic, level) {
 	}
 	return { selected: selectedQuestions, remaining: remainingQuestions };
 }
+
+export function getCorrectOptions(options, multi) {
+	const optionsRes = ['A', 'B', 'C', 'D'];
+	let result = [];
+	for (let i = 0; i < options.length; i++) {
+		if (options[i].isCorrect) {
+			if (multi) {
+				result.push(optionsRes[i]);
+			} else {
+				return optionsRes[i];
+			}
+		}
+	}
+	return result;
+}

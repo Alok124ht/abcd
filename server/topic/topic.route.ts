@@ -29,4 +29,6 @@ router.route('/removeSubtopic').post(topicCtrl.removeSubtopic);
 router.route('/defaultnote/:subTopicId').get(topicCtrl.getDefaultNote);
 router.route('/updatenote').post(topicCtrl.updateNote);
 
+router.route('/getAll').get(topicCtrl.getAll);
+
 export default router;

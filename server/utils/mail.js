@@ -6,8 +6,8 @@ const config = require('../../config/config');
 const supportMailSMTPTransport = nodemailer.createTransport({
 	service: 'gmail',
 	auth: {
-		user: 'support@prepleaf.com',
-		pass: 'bing@prepleafX',
+		user: 'help@prepseed.com',
+		pass: '?fH_XyNx#W$3t!E=',
 	},
 });
 
@@ -22,8 +22,8 @@ const sendEmail = (
 		subject,
 		to,
 		from = `${
-			config.env === ENVIRONMENT.DEV ? 'Dev Prepleaf' : 'Prepleaf'
-		}<noreply@prepleaf.com>`,
+			config.env === ENVIRONMENT.DEV ? 'Dev Prepseed' : 'Prepseed'
+		}<noreply@prepseed.com>`,
 		body,
 		bodyType,
 	},

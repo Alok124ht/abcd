@@ -36,6 +36,7 @@ const UserSchema = new mongoose.Schema(
 				'The value of path {PATH} ({VALUE}) is not a valid mobile number.',
 			],
 		},
+		fcmToken: String,
 		email: { type: String, required: true },
 		emailIdentifier: { type: String },
 		hash: String,
@@ -45,6 +46,11 @@ const UserSchema = new mongoose.Schema(
 		phases: [{ type: ObjectId, ref: 'Phase' }],
 		type: { type: String },
 		salt: String,
+		standard: String,
+		level: Number,
+		board: String,
+		batch: String,
+		parents: [{ type: ObjectId, ref: 'User' }],
 		bookmarks: { type: Array, default: [] },
 		stats: {
 			topics: [

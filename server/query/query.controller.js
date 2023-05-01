@@ -24,6 +24,7 @@ const { getStrippedEmail } = require('../utils/user/email');
 const cacheManager = require('../cache/cache-manager');
 const { convertArrayToCSV } = require('convert-array-to-csv');
 const { isAtLeast } = require('../utils/user/role');
+const _ = require('lodash');
 
 const memoryCache = cacheManager({});
 
@@ -1553,8 +1554,387 @@ function addRegistration(req, res) {
 		res.json({ success: false });
 	}
 }
+async function createSingleUserAlongWithAsigningParentsTogether(req, res) {
+	const {
+		body: { user, phase, subgroup, clientId, portal },
+	} = req;
+	let subgroups;
+	if (!portal || portal !== 'erp') {
+		if (!user || !phase || !subgroup) {
+			res.send({
+				success: false,
+				msg: 'User, Phase and subgroup all required for LMS',
+			});
+			return;
+		} else {
+			if (!user.firstParentName && !user.secondParentName) {
+				res.send({
+					success: false,
+					msg: 'User is there but no parent is linked with it , Atleast one parent is required',
+				});
+				return;
+			}
+		}
+		subgroups = await SubGroupModel.find(
+			{ 'phases.phase': ObjectId(phase), _id: ObjectId(subgroup) },
+			{ supergroup: 1 }
+		);
+	}
+	let studentId = '';
+	let firstParentId = '';
+	let secondParentId = '';
+
+	const subscriptions = [];
+	if (subgroups && subgroups.length === 1) {
+		subscriptions.push({
+			group: subgroups[0].supergroup,
+			subgroups: [
+				{
+					group: subgroups[0]._id.toString(),
+					phases: [
+						{
+							phase: ObjectId(phase),
+							active: true,
+							isAccessGranted: true,
+						},
+					],
+				},
+			],
+		});
+	}
+	const userStrippedEmail = user.email.replace(/(\r\n|\n|\r)/gm, '');
+	const userStrippedPass = user.password.replace(/(\r\n|\n|\r)/gm, '');
+	const userEmailIdentifier = getStrippedEmail(userStrippedEmail);
+	const userExistingUser = await User.findOne({
+		$or: [{ username: user.username }, { emailIdentifier: userEmailIdentifier }],
+	});
+	if (userExistingUser) {
+		res.json({
+			success: false,
+			error:
+				userExistingUser.emailIdentifier === userEmailIdentifier
+					? 'Email already registered'
+					: 'Username already taken',
+			userExistingUser,
+		});
+		return;
+	}
+
+	const finalUser = new User({
+		email: userStrippedEmail,
+		emailIdentifier: userEmailIdentifier,
+		name: user.name,
+		mobileNumber: user.mobileNumber,
+		milestones: [
+			{
+				achievement: 'Joined Prepseed',
+				key: '',
+				date: new Date(),
+			},
+		],
+		username: user.username,
+		settings: {
+			sharing: false,
+			goal: [{ date: new Date().toString(), goal: 1 }],
+		},
+		subscriptions,
+		isVerified: true,
+		portal: portal && portal === 'erp' ? 'erp' : 'lms',
+		client: clientId,
+		role: user.role,
+		standard: user.standard,
+		level: user.level,
+	});
+	studentId = finalUser._id;
+	finalUser.setPassword(userStrippedPass);
+	finalUser
+		.save()
+		.then((savedUser) => {
+			studentId = savedUser._id;
+			const userxp = new Userxp({
+				user: savedUser._id,
+				xp: [
+					{
+						val: constants.xp.signup,
+						reference: savedUser._id,
+						onModel: 'User',
+						description: 'signup',
+					},
+				],
+			});
+			savedUser.netXp = {
+				val: constants.xp.signup,
+			};
+			userxp.save().then((savedUserXp) => {
+				savedUser.netXp.xp = savedUserXp._id;
+				savedUser.markModified('netXp');
+				if (
+					process.env.NODE_ENV === 'production' ||
+					process.env.NODE_ENV === 'staging'
+				) {
+					uploadAvatarInBackground(savedUser);
+				}
+				// res.json({ success: true, user });
+			});
+		})
+		.catch((err) => {
+			res.json({ success: false, user });
+			console.log('check failed id', err);
+		});
+
+	// console.log("sid"+studentId);
+	if (user.firstParentName) {
+		console.log('inside');
+		const firstParentStrippedEmail = user.firstParentEmail.replace(
+			/(\r\n|\n|\r)/gm,
+			''
+		);
+		const firstParentStrippedPass = user.firstParentPassword.replace(
+			/(\r\n|\n|\r)/gm,
+			''
+		);
+		const firstParentEmailIdentifier = getStrippedEmail(firstParentStrippedEmail);
+		const firstParentExistingUser = await User.findOne({
+			username: user.firstParentUsername,
+		});
+		if (firstParentExistingUser) {
+			console.log('First Parent' + firstParentExistingUser._id);
+			const det = await User.updateOne(
+				{ _id: firstParentExistingUser._id },
+				{ $push: { children: studentId } }
+			)
+				.then((result) => {
+					console.log(result);
+				})
+				.catch((error) => {
+					console.log(error);
+				});
+			console.log(det);
+			firstParentId = firstParentExistingUser._id;
+			console.log('ParentId' + firstParentId);
+			if (user.secondParentUsername) {
+				const sec = await User.findOne({
+					username: user.secondParentUsername,
+				});
+				let det1 = await User.updateOne(
+					{ _id: sec._id },
+					{ $push: { children: studentId } }
+				)
+					.then((result) => {
+						console.log(result);
+					})
+					.catch((error) => {
+						console.log(error);
+					});
+				secondParentId = det1._id;
+			}
+
+			const permanentUser1 = await User.findByIdAndUpdate(
+				studentId,
+				{
+					$push: {
+						parents: {
+							$each: [firstParentId, secondParentId],
+						},
+					},
+				},
+				{ new: true }
+			);
+			if (permanentUser1) {
+				return res.json({
+					success: true,
+					user,
+					sId: studentId,
+					p1Id: firstParentId,
+					p2Id: secondParentId,
+				});
+			}
+
+			// }
+		}
+
+		const firstParentFinalUser = new User({
+			email: firstParentStrippedEmail,
+			emailIdentifier: firstParentEmailIdentifier,
+			name: user.firstParentName,
+			mobileNumber: user.firstParentMobileNumber,
+			milestones: [
+				{
+					achievement: 'Joined Prepseed',
+					key: '',
+					date: new Date(),
+				},
+			],
+			username: user.firstParentUsername,
+			settings: {
+				sharing: false,
+				goal: [{ date: new Date().toString(), goal: 1 }],
+			},
+			subscriptions,
+			isVerified: true,
+			portal: portal && portal === 'erp' ? 'erp' : 'lms',
+			client: clientId,
+			role: 'parent',
+			children: [studentId],
+		});
+		firstParentId = firstParentFinalUser._id;
+		firstParentFinalUser.setPassword(firstParentStrippedPass);
+		firstParentFinalUser
+			.save()
+			.then((savedUser) => {
+				firstParentId = savedUser._id;
+				const userxp = new Userxp({
+					user: savedUser._id,
+					xp: [
+						{
+							val: constants.xp.signup,
+							reference: savedUser._id,
+							onModel: 'User',
+							description: 'signup',
+						},
+					],
+				});
+				savedUser.netXp = {
+					val: constants.xp.signup,
+				};
+				userxp.save().then((savedUserXp) => {
+					savedUser.netXp.xp = savedUserXp._id;
+					savedUser.markModified('netXp');
+					if (
+						process.env.NODE_ENV === 'production' ||
+						process.env.NODE_ENV === 'staging'
+					) {
+						uploadAvatarInBackground(savedUser);
+					}
+					// res.json({ success: true, user });
+				});
+			})
+			.catch((err) => {
+				res.json({ success: false, firstParentFinalUser });
+				console.log('check failed id', err);
+			});
+	}
+
+	if (user.secondParentName) {
+		const secondParentStrippedEmail = user.secondParentEmail.replace(
+			/(\r\n|\n|\r)/gm,
+			''
+		);
+		const secondParentStrippedPass = user.secondParentPassword.replace(
+			/(\r\n|\n|\r)/gm,
+			''
+		);
+		const secondParentEmailIdentifier = getStrippedEmail(
+			secondParentStrippedEmail
+		);
+		const secondParentExistingUser = await User.findOne({
+			$or: [
+				{ username: user.secondParentUsername },
+				{ emailIdentifier: secondParentEmailIdentifier },
+			],
+		});
+		if (secondParentExistingUser) {
+			res.json({
+				success: false,
+				error:
+					secondParentExistingUser.emailIdentifier === secondParentEmailIdentifier
+						? 'Paremnt with this Email already registered'
+						: 'Parent with this Username already taken',
+				secondParentExistingUser,
+			});
+			return;
+		}
+
+		const secondParentFinalUser = new User({
+			email: secondParentStrippedEmail,
+			emailIdentifier: secondParentEmailIdentifier,
+			name: user.secondParentName,
+			mobileNumber: user.secondParentMobileNumber,
+			milestones: [
+				{
+					achievement: 'Joined Prepseed',
+					key: '',
+					date: new Date(),
+				},
+			],
+			username: user.secondParentUsername,
+			settings: {
+				sharing: false,
+				goal: [{ date: new Date().toString(), goal: 1 }],
+			},
+			subscriptions,
+			isVerified: true,
+			portal: portal && portal === 'erp' ? 'erp' : 'lms',
+			client: clientId,
+			role: 'parent',
+			children: [studentId],
+		});
+		secondParentId = secondParentFinalUser._id;
+		secondParentFinalUser.setPassword(secondParentStrippedPass);
+		secondParentFinalUser
+			.save()
+			.then((savedUser) => {
+				secondParentId = savedUser._id;
+				const userxp = new Userxp({
+					user: savedUser._id,
+					xp: [
+						{
+							val: constants.xp.signup,
+							reference: savedUser._id,
+							onModel: 'User',
+							description: 'signup',
+						},
+					],
+				});
+				savedUser.netXp = {
+					val: constants.xp.signup,
+				};
+				userxp.save().then((savedUserXp) => {
+					savedUser.netXp.xp = savedUserXp._id;
+					savedUser.markModified('netXp');
+					if (
+						process.env.NODE_ENV === 'production' ||
+						process.env.NODE_ENV === 'staging'
+					) {
+						uploadAvatarInBackground(savedUser);
+					}
+					// res.json({ success: true, user });
+				});
+			})
+			.catch((err) => {
+				res.json({ success: false, secondParentFinalUser });
+				console.log('check failed id', err);
+			});
+	}
+	const permanentUser = await User.findByIdAndUpdate(
+		studentId,
+		{
+			$push: {
+				parents: {
+					$each: [firstParentId, secondParentId],
+				},
+			},
+		},
+		{ new: true }
+	);
+	if (permanentUser) {
+		return res.json({
+			success: true,
+			user,
+			sId: studentId,
+			p1Id: firstParentId,
+			p2Id: secondParentId,
+		});
+	} else {
+		return res.json({
+			success: false,
+			msg: 'User not able to get linked',
+		});
+	}
+}
 
 module.exports = {
+	createSingleUserAlongWithAsigningParentsTogether,
 	allusers,
 	placementusers,
 	catusers,

@@ -121,6 +121,7 @@ export const updateCourse = (
 			if (title) {
 				course.set('title', title);
 			}
+
 			if (originalPrice) {
 				course.set('originalPrice', originalPrice);
 			}
@@ -148,14 +149,8 @@ export const updateCourse = (
 };
 
 export const createCoupon = (req: ExpressRequest, res: ExpressResponse) => {
-	const {
-		code,
-		courses,
-		emailsRaw,
-		maxUsageLimit,
-		maxUsagePerEmail,
-		discount,
-	} = req.body;
+	const { code, courses, emailsRaw, maxUsageLimit, maxUsagePerEmail, discount } =
+		req.body;
 
 	const emails = emailsRaw ? JSON.parse(emailsRaw) : [];
 	const coupon = new Coupon({

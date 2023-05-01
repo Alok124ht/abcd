@@ -19,6 +19,7 @@ import {
 	migrateBookmarks,
 	createBuckets,
 	addRegistration,
+	createSingleUserAlongWithAsigningParentsTogether,
 } from './query.controller';
 import { withPhases } from '../phase/middlewares';
 import auth from '../middleware/auth';
@@ -64,5 +65,9 @@ router.route('/migrate-bookmarks').get(migrateBookmarks);
 router.route('/create-buckets').get(createBuckets);
 
 router.route('/add-registration').post(addRegistration);
+
+router
+	.route('/createSingleUserWithParent')
+	.post(createSingleUserAlongWithAsigningParentsTogether);
 
 export default router;

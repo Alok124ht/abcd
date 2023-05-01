@@ -15,6 +15,11 @@ const schema = new Schema(
 			ref: 'Conversations',
 			required: true,
 		},
+		mediaType: {
+			type: String,
+			enum: ['image', 'video', 'audio', 'pdf', ''],
+			default: '',
+		},
 		readBy: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
 	},
 	{

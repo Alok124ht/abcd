@@ -5,6 +5,86 @@ import MessagesModel from './models/messages.model';
 import { UserInConversation } from './types/conversations';
 import PhaseMentorModel from '../phase/PhaseMentor';
 import ClientModel from '../client/client.model';
+import MessageMediaModel from './models/messagesmedia';
+import PhaseModel from '../phase/phase.model';
+import SubjectModel from '../models/Subject';
+import multer, { diskStorage } from 'multer';
+import * as path from 'path';
+import multerS3 from 'multer-s3';
+import AWS from 'aws-sdk';
+import { Request } from 'express';
+import { S3Client } from '@aws-sdk/client-s3';
+
+// const multerStorage = diskStorage({
+// 	destination: function (req,  file, cb) {
+// 	  cb(
+// 		null,
+// 		'C:\\Users\\Meet Shah\\Downloads\\node-backend-production\\node-backend-production\\server\\chat\\mediafolder'
+// 	  );
+// 	},
+// 	filename: function (req, file, cb) {
+// 	  const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1e9);
+// 	  let extens = file.mimetype.split('/')[1];
+// 	  cb(null, file.fieldname + '_' + uniqueSuffix + '.' + extens);
+// 	},
+//   });
+interface MulterFile extends Express.Multer.File {
+	location?: string;
+}
+const s3 = new S3Client({
+	region: process.env.AVATAR_S3_AWS_REGION,
+	credentials: {
+		accessKeyId: process.env.AVATAR_S3_ACCESS_KEY_ID,
+		secretAccessKey: process.env.AVATAR_S3_SECRET_ACCESS_KEY,
+	},
+});
+
+const upload = multer({
+	storage: multerS3({
+		s3: s3,
+		bucket: process.env.AVATAR_S3_BUCKET,
+		acl: 'public-read',
+		contentType: multerS3.AUTO_CONTENT_TYPE,
+		key: function (req, file, cb) {
+			cb(null, Date.now().toString() + '-' + file.originalname);
+		},
+	}),
+
+	// 	fileFilter: function(req, file, cb) {
+	// 		const allowedMimes = [
+	// 		  'jpeg',
+	// 		  'jpg',
+	// 		  'png',
+	// 		  'gif',
+	// 		  'mp4',
+	// 		  'pdf',
+	// 		  'mpeg'
+	// 		];
+	// 		if (allowedMimes.includes(file.mimetype)) {
+	// 		  cb(null, true);
+	// 		} else {
+	// 		  cb(new Error('Invalid '));
+	// 		}
+	// 	  }
+});
+
+import { MulterError } from 'multer';
+
+export const addTokenToUser = async (
+	req: ExpressRequest,
+	res: ExpressResponse
+) => {
+	try {
+		const { id: userId, fcmToken } = req.body;
+		const userTokening = await UserModel.findById(userId);
+		userTokening.fcmToken = fcmToken;
+		await userTokening.save();
+		res.json({ success: true, msg: 'Token added successfully' });
+	} catch (error) {
+		console.error(error);
+		res.json({ success: false, msg: 'Token Integration Failed' });
+	}
+};
 
 export const addConversation = async (
 	req: ExpressRequest,
@@ -103,6 +183,292 @@ export const getConversations = (req: ExpressRequest, res: ExpressResponse) => {
 		});
 };
 
+export const filteredConversation = async (
+	req: ExpressRequest,
+	res: ExpressResponse
+) => {
+	try {
+		console.log('********************** Called *****************************');
+		const {
+			std = [],
+			levels = [],
+			subject = [],
+			queryPhase = [],
+			batch = [],
+		}: {
+			std?: string[];
+			levels?: string[];
+			subject?: string[];
+			queryPhase?: string[];
+			batch?: string[];
+		} = req.query;
+		const time: string = req.query.time as string;
+
+		if (
+			queryPhase.length === 0 &&
+			std.length === 0 &&
+			levels.length === 0 &&
+			subject.length === 0 &&
+			batch.length === 0
+		) {
+			return res
+				.status(400)
+				.json({ msg: 'At least one query parameter is required' });
+		}
+
+		const filter: any = {};
+
+		if (queryPhase.length > 0) {
+			console.log(queryPhase);
+			const phase = await PhaseModel.find({ name: { $in: queryPhase } });
+			if (phase) {
+				let phaseIds: string[] = [];
+				phaseIds = phase.map((e) => e._id);
+				console.log(phaseIds);
+				filter.phases = { $in: phaseIds };
+			} else {
+				return res.json({ success: false, msg: 'No conversations to load' });
+			}
+		}
+
+		if (std.length > 0) {
+			console.log(std);
+			filter.standard = { $in: std };
+		}
+
+		if (levels.length > 0) {
+			const parsedLevels = levels.map((e) => toNumber(e));
+			filter.level = { $in: parsedLevels };
+		}
+
+		if (subject.length > 0) {
+			const subjectFetched = await SubjectModel.find({ name: { $in: subject } });
+			if (subjectFetched) {
+				let subjectIds: string[] = [];
+				subjectIds = subjectFetched.map((e) => e._id);
+				console.log(subjectIds);
+				filter.subjects = { $in: subjectIds };
+			} else {
+				return res.json({ success: false, msg: 'No conversations to load' });
+			}
+		}
+
+		if (batch.length > 0) {
+			filter.batch = { $in: batch };
+		}
+
+		console.log(filter);
+		const users = await UserModel.find(filter);
+		const userIds = users.map((user: any) => user._id);
+
+		const conversations = await ConversationModel.find({
+			'users.user': { $in: userIds },
+			isGroup: true,
+		}).populate({ path: 'users.user', select: 'name username email mobile dp' });
+		console.log(conversations._id);
+		if (time && (req.query.date || (req.query.fromDate && req.query.toDate))) {
+			return res.json({
+				success: false,
+				msg: 'Time and date cannot be clubbed together',
+			});
+		}
+
+		if (
+			(req.query.fromDate && !req.query.toDate) ||
+			(!req.query.fromDate && req.query.toDate)
+		) {
+			return res.json({
+				success: false,
+				msg: 'Both fromDate and toDate are required',
+			});
+		}
+
+		if (req.query.fromDate && req.query.toDate && req.query.date) {
+			return res.json({
+				success: false,
+				msg: 'All 3 fields cant be passed date,fromDate,toDate',
+			});
+		}
+
+		if ((req.query.date || (req.query.fromDate && req.query.toDate)) && !time) {
+			let queryDate: Date | null = null;
+			let fromDate: Date | null = null;
+			let toDate: Date | null = null;
+			if (req.query.date) {
+				queryDate = new Date(req.query.date as string);
+			} else {
+				fromDate = new Date(req.query.fromDate as string);
+				toDate = new Date(req.query.toDate as string);
+			}
+			const filteredConvos: string[] = [];
+			for (const conversation of conversations) {
+				const messagesDate = await MessagesModel.find({
+					conversation: conversation._id,
+				});
+				messagesDate.forEach((message: any) => {
+					if (queryDate) {
+						if (message.createdAt.toDateString() === queryDate.toDateString()) {
+							filteredConvos.push(message.conversation);
+						}
+					} else {
+						if (message.createdAt >= fromDate && message.createdAt <= toDate) {
+							filteredConvos.push(message.conversation);
+						}
+					}
+				});
+			}
+			if (filteredConvos.length !== 0) {
+				const uniqueConversations = [...new Set(filteredConvos)];
+				const conversations = await ConversationModel.find({
+					_id: { $in: uniqueConversations },
+					isGroup: true,
+				}).populate({
+					path: 'users.user',
+					select: 'name username email mobile dp',
+				});
+				return res.json({ success: true, conversations });
+			} else {
+				return res.json({ success: false, msg: 'No conversations to load' });
+			}
+		}
+
+		if (time && !(req.query.date || (req.query.fromDate && req.query.toDate))) {
+			const maxHours = parseInt(time) * 24;
+			const filteredConversations: any[] = [];
+			for (const conversation of conversations) {
+				const messages = await MessagesModel.find({
+					conversation: conversation._id,
+				}).sort({ createdAt: -1 });
+				if (messages.length > 0) {
+					const lastMessage = messages[0];
+					const timeDiff = new Date().getTime() - lastMessage.createdAt.getTime();
+					const hoursDiff = timeDiff / 1000 / 60 / 60;
+					if (hoursDiff < maxHours) {
+						filteredConversations.push(conversation);
+					}
+				}
+			}
+			if (filteredConversations.length !== 0) {
+				console.log(filteredConversations);
+				return res.json({ success: true, conversations: filteredConversations });
+			} else {
+				return res.json({ success: false, msg: 'No conversations to load' });
+			}
+		}
+
+		if (conversations.length !== 0) {
+			res.json({ success: true, conversations });
+		} else {
+			res.json({ success: false, msg: 'No conversations to load' });
+		}
+	} catch (error) {
+		console.log(error);
+	}
+};
+
+export const dateFilter = (req: ExpressRequest, res: ExpressResponse) => {
+	try {
+		let queryDate: Date | null = null;
+		let fromDate: Date | null = null;
+		let toDate: Date | null = null;
+
+		if (req.query.date) {
+			queryDate = new Date(req.query.date as string);
+		} else {
+			if (!req.query.fromDate || !req.query.toDate) {
+				return res
+					.status(400)
+					.json({ msg: 'Both fromDate and toDate are required' });
+			}
+			fromDate = new Date(req.query.fromDate as string);
+			toDate = new Date(req.query.toDate as string);
+		}
+
+		let conversationIds: string[] = [];
+		ConversationModel.find({}, (err: any, conversations: any) => {
+			if (err) throw err;
+
+			conversations.forEach((conversation: any) => {
+				conversationIds.push(conversation._id);
+			});
+
+			let filteredConversations: string[] = [];
+			MessagesModel.find(
+				{ conversation: { $in: conversationIds } },
+				(err: any, messages: any) => {
+					if (err) throw err;
+
+					messages.forEach((message: any) => {
+						if (queryDate) {
+							if (message.createdAt.toDateString() === queryDate.toDateString()) {
+								filteredConversations.push(message.conversation);
+							}
+						} else {
+							if (message.createdAt >= fromDate && message.createdAt <= toDate) {
+								filteredConversations.push(message.conversation);
+							}
+						}
+					});
+
+					if (filteredConversations.length !== 0) {
+						const uniqueConversations = [...new Set(filteredConversations)];
+						ConversationModel.find({
+							_id: { $in: uniqueConversations },
+							isGroup: true,
+						})
+							.populate({
+								path: 'users.user',
+								select: 'name username email mobile dp',
+							})
+							.exec((err, conversations) => {
+								if (err) throw err;
+
+								return res.json({ success: true, conversations });
+							});
+					} else {
+						return res.json({ success: false, msg: 'No conversations to load' });
+					}
+				}
+			);
+		});
+	} catch (error) {
+		console.log(error);
+	}
+};
+
+export const timeFilter = async (req: ExpressRequest, res: ExpressResponse) => {
+	try {
+		const time = parseInt(req.query.time as string);
+		console.log('Time = ' + time);
+		const conversations = await ConversationModel.find({ isGroup: true });
+		const filteredConversations: any[] = [];
+
+		for (const conversation of conversations) {
+			const messages = await MessagesModel.find({
+				conversation: conversation._id,
+			}).sort({ createdAt: -1 });
+
+			if (messages.length > 0) {
+				const lastMessage = messages[0];
+				console.log('Last Message' + lastMessage);
+				const timeDiff: number =
+					new Date().getTime() - lastMessage.createdAt.getTime();
+				const hoursDiff: number = timeDiff / 1000 / 60 / 60;
+				const maxHours: number = time * 24;
+
+				if (hoursDiff < maxHours) {
+					filteredConversations.push(conversation);
+				}
+			}
+		}
+
+		return res.json(filteredConversations);
+	} catch (err) {
+		console.log(err);
+		return res.status(500).json({ error: 'Server error' });
+	}
+};
+
 export const deleteConversation = (
 	req: ExpressRequest,
 	res: ExpressResponse
@@ -162,6 +528,10 @@ export const getConversation = (req: ExpressRequest, res: ExpressResponse) => {
 			path: 'sender',
 			select: 'name',
 		})
+		.populate({
+			path: 'media',
+			select: 'url mediaType',
+		})
 		.skip(toNumber(skip))
 		.limit(toNumber(limit))
 		.sort({ createdAt: -1 })
@@ -174,76 +544,80 @@ export const getConversation = (req: ExpressRequest, res: ExpressResponse) => {
 };
 
 export const addMessage = (req: ExpressRequest, res: ExpressResponse) => {
-	const { id: conversation, text } = req.body;
-	const { id: sender } = req.payload;
-
-	if (!conversation || !text) {
-		res.send({ success: false, msg: 'Please send proper parameters' });
-		return;
-	}
-
-	const newMessage = new MessagesModel({
-		conversation,
-		text,
-		sender,
-		readBy: [sender],
-	});
-
-	newMessage.save(async (err, saved) => {
-		if (saved) {
-			const conversation = await ConversationModel.findById(
-				saved.conversation
-			).select('isGroup');
-			const temporaryDeletedFor: any[] = [];
-			if (conversation.isGroup) {
-				forEach(conversation.users, (users) => {
-					temporaryDeletedFor.push(users.user);
-				});
-			}
-
-			ConversationModel.updateOne(
-				{ _id: conversation },
-				{ $pop: { temporaryDeletedFor } }
-			);
-			res.send({ success: true, msg: 'Message sent!' });
-		} else {
-			res.send({ success: false, msg: 'Failed to sent!' });
+	upload.array('filesname', 10)(req, res, async (err: any) => {
+		if (err instanceof MulterError) {
+			// Handle Multer errors
+			return res.status(500).json({ error: err.message });
+		} else if (err) {
+			// Handle other errors
+			return res.status(500).json({ error: err.message });
 		}
+		// console.log(req.files);
+		const { id: conversation, text } = req.body;
+		const { id: sender } = req.payload;
+		if (!conversation) {
+			return res.send({ success: false, msg: 'Converstaion Id Not Sent' });
+		}
+		// if (text === '' && !req.files) {
+		//     return res.send({
+		//         success: false,
+		//         msg: 'At least One Parameter Text or File should be passed',
+		//     });
+		// }
+
+		let newMessage = new MessagesModel({
+			conversation,
+			text,
+			sender,
+			readBy: [sender],
+			mediaType: '',
+		});
+
+		if (req.files) {
+			let mediaIds: any[] = [];
+			for (let file of req.files as MulterFile[]) {
+				const reqFilename = file.originalname;
+				const reqFileExtention = file.mimetype.split('/')[1];
+				const reqMimeType = file.mimetype.split('/')[0];
+				const reqFileUrl = file.location;
+				const newMediaMessage = new MessageMediaModel({
+					url: reqFileUrl,
+					mediaType: reqMimeType,
+					message: newMessage._id,
+				});
+				console.log(newMediaMessage);
+
+				const saved1 = await newMediaMessage.save();
+
+				if (saved1) {
+					mediaIds.push(saved1._id);
+				}
+			}
+			newMessage.media = mediaIds;
+		}
+		// console.log(newMessage)
+
+		newMessage.save(async (err: any, saved: any) => {
+			if (saved) {
+				const conversation = await ConversationModel.findById(
+					saved.conversation
+				).populate({ path: 'users.user', select: 'name username email mobile dp' });
+				const temporaryDeletedFor: any[] = [];
+				if (conversation.isGroup) {
+					conversation.users.forEach((users: any) => {
+						temporaryDeletedFor.push(users.user);
+					});
+				}
+				ConversationModel.updateOne(
+					{ _id: conversation._id },
+					{ $pop: { temporaryDeletedFor } }
+				);
+				return res.send({ success: true, msg: 'Message sent!' });
+			} else {
+				return res.send({ success: false, msg: err + 'Failed to sent!' });
+			}
+		});
 	});
-};
-
-export const unsendMessage = (req: ExpressRequest, res: ExpressResponse) => {
-	const { id: messageId } = req.query;
-
-	if (!messageId) {
-		res.send({ success: false, msg: 'Id is not sent' });
-		return;
-	}
-
-	MessagesModel.updateOne({ _id: messageId }, { $set: { isArchived: true } })
-		.then((updated) => res.send({ success: true, message: 'Message Unsent!' }))
-		.catch(() =>
-			res.send({ success: false, msg: 'Error while unsending message' })
-		);
-};
-
-export const deleteMessages = (req: ExpressRequest, res: ExpressResponse) => {
-	const { id } = req.payload;
-	const { messages } = req.body;
-
-	if (!messages || !isArray(messages) || messages.length === 0) {
-		res.send({ success: false, msg: 'Please send proper parameters' });
-		return;
-	}
-
-	MessagesModel.updateMany(
-		{ _id: { $in: messages } },
-		{ $push: { deletedFor: id } }
-	)
-		.then((updated) => res.send({ success: true, msg: 'Messages removed' }))
-		.catch(() =>
-			res.send({ success: false, msg: 'Error while removing messages' })
-		);
 };
 
 export const conversationOpened = async (

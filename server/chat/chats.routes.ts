@@ -8,7 +8,7 @@ import {
 	changeAdminOnly,
 	conversationOpened,
 	deleteConversation,
-	deleteMessages,
+	// deleteMessages,
 	editGroupDetailsByKeyValue,
 	getConversation,
 	getConversations,
@@ -16,7 +16,11 @@ import {
 	leftGroup,
 	removeAsAdmin,
 	removeUserFromGroup,
-	unsendMessage,
+	filteredConversation,
+	dateFilter,
+	timeFilter,
+	addTokenToUser,
+	// unsendMessage,
 } from './chats.controller';
 
 const chatsRoutes = Router();
@@ -26,6 +30,14 @@ chatsRoutes
 	.post(auth.required, addConversation)
 	.get(auth.required, getConversations)
 	.delete(auth.required, deleteConversation);
+
+chatsRoutes
+	.route('/filteredConversations')
+	.get(auth.required, filteredConversation);
+chatsRoutes.route('/addTokenToUser').post(auth.required, addTokenToUser);
+
+chatsRoutes.route('/filteredDate').get(auth.required, dateFilter);
+chatsRoutes.route('/filteredTime').get(auth.required, timeFilter);
 
 chatsRoutes.route('/conversation/get').get(auth.required, getConversation);
 
@@ -61,9 +73,9 @@ chatsRoutes.route('/conversation/group/left').get(auth.required, leftGroup);
 
 chatsRoutes.route('/message').post(auth.required, addMessage);
 
-chatsRoutes.route('/message/delete').post(auth.required, deleteMessages);
+// chatsRoutes.route('/message/delete').post(auth.required, deleteMessages);
 
-chatsRoutes.route('/message/unsend').post(auth.required, unsendMessage);
+// chatsRoutes.route('/message/unsend').post(auth.required, unsendMessage);
 
 chatsRoutes.route('/get-users').get(auth.required, getUsersAsPerAccess);
 

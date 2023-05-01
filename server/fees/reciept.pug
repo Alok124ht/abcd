@@ -1,0 +1,106 @@
+doctype html
+html(lang="en")
+  head
+    meta(charset="UTF-8")
+    meta(http-equiv="X-UA-Compatible", content="IE=edge")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+    title Fee Reciept
+    style
+      @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;500;700&display=swap');
+      *
+        font-family: 'Roboto', 'Arial Narrow', Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      .reciept
+        width: 800px
+        margin: 50px auto
+      .header
+        display: flex
+      .logo
+        max-height: 100px
+      .logo-2
+        max-height: 60px
+      .header-2
+        text-align: center
+      .student-info
+        display: flex
+        flex-direction: column
+        justify-content: center
+      .name
+        display: flex
+        justify-content: space-between
+        margin: 10px 0px
+      .add-info
+        display: flex
+        justify-content: space-between
+        margin: 10px 0px
+      table, th, td
+        border: 1px solid black
+        border-collapse: collapse
+        text-align: center
+        padding: 5px
+      .underline
+        border-bottom: 1px solid black
+      .small
+        font-size: small
+      .footer
+        background: black
+        color: white
+        height: 30px
+        display: flex
+        justify-content: space-between
+        align-items: center
+      .black
+        background: black
+        color: white
+        height: 30px
+        font-weight: 600
+        font-size: 20px
+      .address
+        font-size: small
+      .acedemic-year
+        margin: 10px
+      .middle
+        display: flex
+        flex-direction: column
+      .signature img
+        opacity: 0.3
+        height: 60px
+        border-bottom: 1px solid black
+      .amount
+        display: flex
+        justify-content: space-between
+        align-items: flex-start
+  body
+    .reciept
+      .header
+        img.logo(src="sas-1.png")
+        .header-2
+          .address B/h R.F.A camp, Opp. Gram Panchayat, Vastral, Ahmedabad - 382418
+            br
+            | Ph. 909965600 | Email: info@vastral.shantiasiatic.com
+          .black Reciept Voucher
+          .acedemic-year Acedemic year: 20{year}/ 20{year}
+        div.3
+          img.logo-2(src="sas-2.png")
+          .reciept-no Reciept No.
+          .date
+            span.underline {data}
+      .student-info
+        .name
+          .first Name of Student
+            span.small (in capital latters)
+            | :
+          .first.underline {FirstName}
+          .middle.underline {MiddleName}
+          .last.underline {lastName}
+        .add-info
+          .admission-no Admission no:
+            span.underline {data}
+          .class class:
+            span.underline {data}
+          .section section:
+            span.underline {data}
+          .mobile-number Mobile Number: 709647078
+      table.table
+        tr

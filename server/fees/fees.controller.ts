@@ -21,6 +21,13 @@ export const addFees = async (req: ExpressRequest, res: ExpressResponse) => {
 		referenceId,
 		feeType,
 		policy,
+		acedemicYear,
+		studentName,
+		admissionNumber,
+		classOf,
+		section,
+		mobileNumber,
+		quarter,
 	} = req.body;
 
 	if (
@@ -69,6 +76,13 @@ export const addFees = async (req: ExpressRequest, res: ExpressResponse) => {
 		referenceId,
 		feeType,
 		policy,
+		acedemicYear,
+		studentName,
+		admissionNumber,
+		classOf,
+		section,
+		mobileNumber,
+		quarter,
 	}).save((err) => {
 		if (err) res.send({ success: false, msg: 'Error while adding Fees' });
 		else res.send({ success: true, msg: 'Fee added!' });

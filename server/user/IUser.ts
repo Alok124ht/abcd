@@ -134,6 +134,11 @@ interface JeeData {
 
 export interface IUser extends Document {
 	username: string;
+	fcmToken: string;
+	standard: String;
+	level: Number;
+	batch: String;
+	board: String;
 	name: string;
 	email: string;
 	emailIdentifier: string;
@@ -143,6 +148,7 @@ export interface IUser extends Document {
 	verifiedBy: string;
 	role: UserRole;
 	phases: Types.ObjectId[];
+	parents: Types.ObjectId[];
 	type: string;
 	salt: string;
 	bookmarks: any[];

@@ -5,6 +5,10 @@ const schema = new Schema(
 	{
 		url: { type: String, required: true },
 		message: { type: Schema.Types.ObjectId, required: true, ref: 'Messages' },
+		mediaType: {
+			type: String,
+			required: true,
+		},
 	},
 	{
 		timestamps: true,

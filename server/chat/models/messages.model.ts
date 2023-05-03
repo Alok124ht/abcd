@@ -5,7 +5,7 @@ const schema = new Schema(
 	{
 		sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 		isArchived: { type: Boolean, default: false },
-		text: { type: String, required: true },
+		text: { type: String },
 		media: [
 			{ type: Schema.Types.ObjectId, ref: 'MessageMedias', required: true },
 		],
@@ -19,6 +19,10 @@ const schema = new Schema(
 			type: String,
 			enum: ['image', 'video', 'audio', 'pdf', ''],
 			default: '',
+		},
+		isRedFlag: {
+			type: Boolean,
+			default: false,
 		},
 		readBy: [{ type: Schema.Types.ObjectId, ref: 'User', required: true }],
 	},

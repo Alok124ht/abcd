@@ -8,6 +8,7 @@ interface UserInConversation extends Document {
 
 export interface IConversation extends Document {
 	users: UserInConversation[];
+	isRedFlag: boolean;
 	isGroup: boolean;
 	createdBy: IUser;
 	name?: string;

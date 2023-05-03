@@ -21,6 +21,10 @@ const schema = new Schema(
 		name: String,
 		description: String,
 		image: String,
+		isRedFlag: {
+			type: Boolean,
+			default: false,
+		},
 		removedMembers: [
 			{
 				user: { type: Schema.Types.ObjectId, ref: 'User', required: true },

@@ -20,6 +20,7 @@ import {
 	dateFilter,
 	timeFilter,
 	addTokenToUser,
+	toggleMessageRedFlag,
 	// unsendMessage,
 } from './chats.controller';
 
@@ -73,6 +74,9 @@ chatsRoutes.route('/conversation/group/left').get(auth.required, leftGroup);
 
 chatsRoutes.route('/message').post(auth.required, addMessage);
 
+chatsRoutes
+	.route('/toggleMessageRedFlag')
+	.post(auth.required, toggleMessageRedFlag);
 // chatsRoutes.route('/message/delete').post(auth.required, deleteMessages);
 
 // chatsRoutes.route('/message/unsend').post(auth.required, unsendMessage);

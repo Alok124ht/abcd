@@ -10,4 +10,5 @@ export interface IMessage {
 	deletedFor: IUser[];
 	conversation: IConversation;
 	readBy: IUser[];
+	isRedFlag: boolean;
 }

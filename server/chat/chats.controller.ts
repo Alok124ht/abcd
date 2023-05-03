@@ -86,6 +86,45 @@ export const addTokenToUser = async (
 	}
 };
 
+export const toggleMessageRedFlag = async (
+	req: ExpressRequest,
+	res: ExpressResponse
+) => {
+	const { id: messageId } = req.body;
+	if (!messageId) {
+		return res.json({ success: false, msg: 'Message ID is required' });
+	}
+	try {
+		let outputBool: Boolean = false;
+		let outputSring: string = '';
+		const message = await MessagesModel.findById(messageId);
+		if (!message) {
+			return res.json({ success: false, msg: 'Message not found' });
+		}
+		outputBool = !message.isRedFlag;
+		message.isRedFlag = !message.isRedFlag;
+		await message.save();
+		const conversation = await ConversationModel.findById(message.conversation);
+		const hasRedFlagMessages: boolean = await MessagesModel.exists({
+			conversation: conversation?._id,
+			isRedFlag: true,
+		});
+		if (conversation) {
+			conversation.isRedFlag = hasRedFlagMessages;
+			await conversation.save();
+		}
+
+		if (outputBool) {
+			outputSring = 'Red Flag Added';
+		} else {
+			outputSring = 'Red Flag Removed';
+		}
+		return res.send({ success: true, msg: outputSring });
+	} catch (err) {
+		console.error(err);
+		return res.status(500).json({ success: false, msg: 'Server error' });
+	}
+};
 export const addConversation = async (
 	req: ExpressRequest,
 	res: ExpressResponse
@@ -558,13 +597,15 @@ export const addMessage = (req: ExpressRequest, res: ExpressResponse) => {
 		if (!conversation) {
 			return res.send({ success: false, msg: 'Converstaion Id Not Sent' });
 		}
-		// if (text === '' && !req.files) {
-		//     return res.send({
-		//         success: false,
-		//         msg: 'At least One Parameter Text or File should be passed',
-		//     });
-		// }
-
+		if (text === '' || text == undefined || text == null) {
+			if (req.files.length == 0) {
+				return res.send({
+					success: false,
+					msg: 'At least One Parameter Text or File should be passed',
+				});
+			}
+		}
+		let reqMimeType: string = '';
 		let newMessage = new MessagesModel({
 			conversation,
 			text,
@@ -578,7 +619,7 @@ export const addMessage = (req: ExpressRequest, res: ExpressResponse) => {
 			for (let file of req.files as MulterFile[]) {
 				const reqFilename = file.originalname;
 				const reqFileExtention = file.mimetype.split('/')[1];
-				const reqMimeType = file.mimetype.split('/')[0];
+				reqMimeType = file.mimetype.split('/')[0];
 				const reqFileUrl = file.location;
 				const newMediaMessage = new MessageMediaModel({
 					url: reqFileUrl,
@@ -602,17 +643,49 @@ export const addMessage = (req: ExpressRequest, res: ExpressResponse) => {
 				const conversation = await ConversationModel.findById(
 					saved.conversation
 				).populate({ path: 'users.user', select: 'name username email mobile dp' });
+
+				let filterUser: string[] = [];
+				conversation.users.forEach((ele) => filterUser.push(ele.user._id));
+				console.log(filterUser);
+
+				const tokensArray: string[] = [];
+				let sendername: string = '';
+				for (const ele of filterUser) {
+					const userSpecific = await UserModel.findById(ele);
+					console.log(saved.sender);
+					if (userSpecific.fcmToken && ele != toString(saved.sender)) {
+						// console.log(user_specific.fcmToken);
+						tokensArray.push(userSpecific.fcmToken);
+					} else if (ele == toString(saved.sender)) {
+						sendername = userSpecific.name;
+					}
+				}
+				await Promise.all(tokensArray);
+				console.log(tokensArray);
 				const temporaryDeletedFor: any[] = [];
 				if (conversation.isGroup) {
 					conversation.users.forEach((users: any) => {
 						temporaryDeletedFor.push(users.user);
 					});
 				}
+
 				ConversationModel.updateOne(
 					{ _id: conversation._id },
 					{ $pop: { temporaryDeletedFor } }
 				);
-				return res.send({ success: true, msg: 'Message sent!' });
+
+				let textSend: string = '';
+				if (saved.text) {
+					textSend = saved.text;
+				}
+				return res.send({
+					success: true,
+					msg: 'Message sent!',
+					fcmTokensArray: tokensArray,
+					senderName: sendername,
+					reqMimeType,
+					textSend,
+				});
 			} else {
 				return res.send({ success: false, msg: err + 'Failed to sent!' });
 			}
